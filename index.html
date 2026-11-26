@@ -1,365 +1,67 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PCR plateau: why amplification stops</title>
+<title>BMSC class demos</title>
 <style>
-:root{--bg:#0f141b;--panel:#161d27;--ink:#e8edf3;--muted:#9fb0c3;--line:#2c3746;--grid:#222c39;--cur:#5aa2ff;--copy:#3ccf91;--rep:#ff9f43;--wait:#b07cff;--ceil:#ff6b6b;--ghost:#6f7f93}
-[data-theme=light]{--bg:#f7f8fa;--panel:#ffffff;--ink:#16202c;--muted:#4a5a6c;--line:#cfd7e1;--grid:#e6ebf1;--cur:#1f5fae;--copy:#16875a;--rep:#c8650a;--wait:#7442c8;--ceil:#c0392b;--ghost:#8d99a8}
+:root{--bg:#f7f8fa;--card:#fff;--ink:#16202c;--muted:#4a5a6c;--line:#d5dce5;--acc:#1f5fae;--chip:#e8eef6}
+@media (prefers-color-scheme:dark){:root{--bg:#0f141b;--card:#161d27;--ink:#e8edf3;--muted:#9fb0c3;--line:#2c3746;--acc:#5aa2ff;--chip:#1f2a38}}
 *{box-sizing:border-box}
-html,body{height:100%}
-body{margin:0;background:var(--bg);color:var(--ink);font:18px/1.35 system-ui,Segoe UI,Roboto,Arial,sans-serif;display:flex;flex-direction:column;overflow:hidden}
-header{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;padding:10px 20px 2px}
-h1{font-size:26px;margin:0}
-.sub{color:var(--muted);font-size:16px}
-.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 20px 6px;font-size:16px}
-button{font:inherit;font-size:16px;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:4px 10px;cursor:pointer}
-button[aria-pressed=true]{outline:2px solid var(--cur)}
-#scrub{flex:1;min-width:120px}
-main{flex:1;min-height:0;display:flex;gap:12px;padding:0 20px 6px}
-#stage{flex:1;min-width:0;position:relative}
-#cv{position:absolute;inset:0;width:100%;height:100%}
-aside{width:390px;flex:none;display:flex;flex-direction:column;gap:8px;overflow:auto}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 12px}
-#cyc{font-size:15px;color:var(--muted);margin:0}
-#stTitle{font-size:20px;font-weight:700;margin:0 0 3px}
-#stText{font-size:16px;margin:0}
-#vig{width:100%;height:132px;display:block}
-.meter{display:grid;grid-template-columns:110px 1fr 92px;gap:6px;align-items:center;font-size:14px;margin:3px 0}
-.meter .trk{height:10px;border-radius:5px;background:var(--line);overflow:hidden}
-.meter .trk i{display:block;height:100%;width:0;background:var(--cur)}
-.meter b{font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
-.knob{display:grid;grid-template-columns:150px 1fr 74px;gap:6px;align-items:center;font-size:14px;margin:2px 0}
-.knob b{text-align:right;font-weight:600;font-variant-numeric:tabular-nums}
-.knob input{width:100%}
-.foot{color:var(--muted);font-size:14px;padding:0 20px 8px;margin:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.45 system-ui,Segoe UI,Roboto,Arial,sans-serif}
+.wrap{max-width:1200px;margin:0 auto;padding:28px 20px 40px}
+h1{font-size:30px;margin:0 0 4px}
+.lede{color:var(--muted);margin:0 0 18px}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 20px}
+.filters button{font:inherit;font-size:15px;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:4px 14px;cursor:pointer}
+.filters button[aria-pressed=true]{background:var(--acc);border-color:var(--acc);color:#fff}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:18px}
+a.card{display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;color:inherit;text-decoration:none;transition:transform .12s,box-shadow .12s}
+a.card:hover,a.card:focus-visible{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.18);outline:none;border-color:var(--acc)}
+a.card img{width:100%;aspect-ratio:16/9;object-fit:cover;display:block;border-bottom:1px solid var(--line);background:#111}
+.body{padding:12px 14px 14px;display:flex;flex-direction:column;gap:6px}
+.tags{display:flex;gap:6px;flex-wrap:wrap}
+.course,.topic{font-size:13px;font-weight:600;background:var(--chip);color:var(--acc);border-radius:999px;padding:2px 10px}
+h2{font-size:19px;margin:0}
+.topic{background:transparent;border:1px solid var(--line);color:var(--muted);font-weight:500}
+.body p{margin:0;color:var(--muted);font-size:15px}
+footer{color:var(--muted);font-size:14px;margin-top:28px}
 </style>
-<script type="application/json" id="demo-meta">{"title":"PCR plateau: why amplification stops","course":"PCR lecture (slide: How does it keep going? Is there a limit?)","summary":"Copies per tube, cycle by cycle, from 1 pg of a 5 kb plasmid (2 x 10^5 copies). Early on every strand gets a primer and a Taq, so copies double. Near cycle 20 the Taq cannot finish all the primed strands in one extension step, so each cycle adds a fixed number. As product piles up, strands find their own partners on cooling before a primer lands. Each cycle adds less until the curve flattens. Switch either brake off to see what it does; a 100-fold dilution series shows every tube reaching the same plateau."}</script>
 </head>
 <body>
-<header>
-  <h1>PCR plateau: why amplification stops</h1>
-  <span class="sub">Copies of the target in one tube, cycle by cycle. Two brakes: limited Taq, and template strands re-pairing.</span>
-</header>
-<div class="bar">
-  <button id="bPlay" title="Space">Play (Space)</button>
-  <button id="bBack" title="Left arrow">&#8592;</button>
-  <button id="bNext" title="Right arrow">&#8594;</button>
-  <button id="bReset" title="R">Reset (R)</button>
-  <input id="scrub" type="range" min="0" max="40" value="0" aria-label="cycle">
-  <button id="bRe" aria-pressed="true" title="A">Re-pairing on (A)</button>
-  <button id="bEnz" aria-pressed="true" title="E">Taq limit on (E)</button>
-  <button id="bLog" aria-pressed="false" title="G">Linear axis (G)</button>
-  <button id="bSer" aria-pressed="false" title="S">Dilution series (S)</button>
-  <button id="bLight" title="L">Light (L)</button>
-  <button id="bFull" title="F">Full screen (F)</button>
+<div class="wrap">
+  <h1>BMSC class demos</h1>
+  <p class="lede">Interactive visuals used in class. Click a card to open it; each runs in the browser with nothing to install. Most have keyboard keys listed along their top bar (Space plays, F is full screen).</p>
+  <div class="filters" id="filters"></div>
+  <div class="grid" id="grid"></div>
+  <footer>Each demo folder also has CLAIMS.md and SOURCES.md listing what it shows and where that comes from.</footer>
 </div>
-<main>
-  <div id="stage"><canvas id="cv"></canvas></div>
-  <aside>
-    <div class="card">
-      <p id="cyc">Cycle 0</p>
-      <p id="stTitle"></p>
-      <p id="stText"></p>
-    </div>
-    <div class="card" id="vigCard"><canvas id="vig"></canvas></div>
-    <div class="card" id="meters">
-      <div class="meter"><span>Copies (dsDNA)</span><span class="trk"><i id="mCopy"></i></span><b id="vCopy"></b></div>
-      <div class="meter"><span>Primers used</span><span class="trk"><i id="mPri"></i></span><b id="vPri"></b></div>
-      <div class="meter"><span>dNTPs used</span><span class="trk"><i id="mNtp"></i></span><b id="vNtp"></b></div>
-      <div class="meter"><span>Taq workload</span><span class="trk"><i id="mTaq"></i></span><b id="vTaq"></b></div>
-    </div>
-    <div class="card">
-      <div class="knob"><span>Starting copies</span><input id="kN0" type="range" min="2" max="9" step="0.1" value="5.3"><b id="vN0"></b></div>
-      <div class="knob"><span>Taq molecules</span><input id="kE" type="range" min="9" max="11" step="0.1" value="10"><b id="vE"></b></div>
-      <div class="knob"><span>Extension time</span><input id="kT" type="range" min="15" max="120" step="5" value="60"><b id="vT"></b></div>
-      <div class="knob"><span>Amplicon length</span><input id="kL" type="range" min="100" max="2000" step="50" value="200"><b id="vL"></b></div>
-      <div class="knob"><span>Primers (each)</span><input id="kP" type="range" min="11" max="13" step="0.1" value="12"><b id="vP"></b></div>
-    </div>
-  </aside>
-</main>
-<p class="foot">Model: each cycle, every template strand either gets a primer or re-pairs with its partner, and re-pairing grows as product piles up. Taq finishes at most Taq &times; 50&nbsp;nt/s &times; extension time &divide; length strands per cycle. Each new strand uses one primer. Amplicon length and extension time are illustrative. Other brakes left out: Taq heat loss, Taq bound up by product, pyrophosphate.</p>
 <script>
-(function () {
-  'use strict';
-  var NC = 40, V = 50, NTP0 = 1e15, SK = 4;
-  var prm = {N0: 2e5, E: 1e10, t: 60, L: 200, P0: 1e12, r: 3};
-  var opt = {re: true, enz: true, log: false, ser: false};
-  var cyc = 0, playing = false, anim = 1, lastTs = 0;
-  var SERIES = [2e8, 2e6, 2e4, 2e2];
-
-  // ---- model: counts per tube; D = double-stranded target copies, P = each primer left ----
-  function cap(p) { return p.E * V * p.t / p.L; }
-  function sim(p, o, n) {
-    var S = 2 * p.N0, P = p.P0, used = 0, out = [{c: 0, D: p.N0, P: P, ntp: 0, copied: 1, rep: 0, wait: 0, primed: 0, made: 0, cap: cap(p)}];
-    var C = cap(p);
-    for (var c = 1; c <= n; c++) {
-      var D = S / 2, T = 2 * D;
-      var primed = o.re ? T * P / (P + p.r * D) : Math.min(T, 2 * P);
-      var made = o.enz ? Math.pow(Math.pow(primed, -SK) + Math.pow(C, -SK), -1 / SK) : primed; // soft minimum: Taq gets busy gradually, not at one cycle
-      made = Math.min(made, (NTP0 - used) / (p.L / 4)); // dNTPs: each new strand uses about L/4 of each
-      S += made; P -= made / 2; used += made * p.L / 4;
-      out.push({c: c, D: S / 2, P: P, ntp: used, copied: made / T, rep: (T - primed) / T, wait: (primed - made) / T, primed: primed, made: made, cap: C});
-    }
-    return out;
-  }
-  function onset(run) { for (var i = 1; i < run.length; i++) if (run[i].primed > run[i].cap) return i; return null; }
-  function ct(run, th) { for (var i = 1; i < run.length; i++) if (run[i].D >= th) { var a = Math.log(run[i - 1].D), b = Math.log(run[i].D); return i - 1 + (Math.log(th) - a) / (b - a); } return null; }
-
-  var run, ghosts, series;
-  function recompute() {
-    run = sim(prm, opt, NC);
-    ghosts = [
-      {k: 'No brakes (primers only)', r: sim(prm, {re: false, enz: false}, NC)},
-      {k: 'Re-pairing only', r: sim(prm, {re: true, enz: false}, NC)},
-      {k: 'Taq limit only', r: sim(prm, {re: false, enz: true}, NC)},
-      {k: 'Both', r: sim(prm, {re: true, enz: true}, NC)}
-    ];
-    series = SERIES.map(function (n0) { var q = Object.assign({}, prm, {N0: n0}); return {n0: n0, r: sim(q, opt, NC)}; });
-  }
-
-  // ---- formatting ----
-  var SUP = {'-': '⁻', '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹'};
-  function sup(n) { return String(n).split('').map(function (ch) { return SUP[ch]; }).join(''); }
-  function sci(x) { if (x <= 0) return '0'; var e = Math.floor(Math.log10(x) + 1e-9), m = x / Math.pow(10, e); if (m >= 9.95) { m = 1; e++; } return (Math.abs(m - 1) < 0.05 ? '' : m.toFixed(1) + ' × ') + '10' + sup(e); }
-  function pct(x) { return x < 0.001 ? '<0.1%' : x < 0.1 ? (x * 100).toFixed(1) + '%' : Math.round(x * 100) + '%'; }
-  function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
-
-  // ---- drawing ----
-  var cv = document.getElementById('cv'), g = cv.getContext('2d');
-  var vg = document.getElementById('vig'), h = vg.getContext('2d');
-  function fit(c, ctx) { var r = c.getBoundingClientRect(), d = window.devicePixelRatio || 1; c.width = Math.round(r.width * d); c.height = Math.round(r.height * d); ctx.setTransform(d, 0, 0, d, 0, 0); return {w: r.width, h: r.height}; }
-
-  var Y0 = 2, Y1 = 13;
-  function render() {
-    var s = fit(cv, g), W = s.w, H = s.h;
-    var ink = css('--ink'), mut = css('--muted'), grid = css('--grid'), cur = css('--cur'), gh = css('--ghost');
-    g.clearRect(0, 0, W, H);
-    var L = 100, R = opt.ser ? 190 : 150, T = 18, fateH = opt.ser ? 0 : Math.max(90, H * 0.24), gap = opt.ser ? 0 : 64;
-    var B = H - 40 - fateH - gap, pw = W - L - R;
-    var X = function (c) { return L + pw * c / NC; };
-    var ymax = opt.log ? Y1 : prm.P0 * 1.12;
-    var Yv = function (v) { if (opt.log) { var lv = Math.log10(Math.max(v, Math.pow(10, Y0))); return B - (B - T) * (lv - Y0) / (Y1 - Y0); } return B - (B - T) * v / ymax; };
-    g.font = '15px system-ui,Segoe UI,Arial'; g.lineWidth = 1;
-    // grid + axes
-    g.strokeStyle = grid; g.fillStyle = mut; g.textAlign = 'right'; g.textBaseline = 'middle';
-    if (opt.log) { for (var e = Y0; e <= Y1; e++) { var y = Yv(Math.pow(10, e)); g.beginPath(); g.moveTo(L, y); g.lineTo(L + pw, y); g.stroke(); g.fillText('10' + sup(e), L - 8, y); } }
-    else { var stp = Math.pow(10, Math.floor(Math.log10(ymax / 4))); var nst = ymax / stp > 8 ? 2 * stp : stp; for (var v = 0; v <= ymax; v += nst) { var y2 = Yv(v); g.beginPath(); g.moveTo(L, y2); g.lineTo(L + pw, y2); g.stroke(); g.fillText(v === 0 ? '0' : sci(v), L - 8, y2); } }
-    g.textAlign = 'center'; g.textBaseline = 'top';
-    for (var c = 0; c <= NC; c += 5) { g.beginPath(); g.moveTo(X(c), T); g.lineTo(X(c), B); g.stroke(); g.fillText(c, X(c), B + 6); }
-    g.fillText('Cycle', L + pw / 2, B + 24);
-    g.save(); g.translate(16, (T + B) / 2); g.rotate(-Math.PI / 2); g.textBaseline = 'middle'; g.fillText('Copies per tube' + (opt.log ? ' (log)' : ''), 0, 0); g.restore();
-    // primer ceiling
-    g.strokeStyle = css('--ceil'); g.setLineDash([6, 5]); g.beginPath(); g.moveTo(L, Yv(prm.P0)); g.lineTo(L + pw, Yv(prm.P0)); g.stroke(); g.setLineDash([]);
-    g.fillStyle = css('--ceil'); g.textAlign = 'left'; g.textBaseline = 'bottom'; g.fillText('Ceiling: primers (' + sci(prm.P0) + ' each)', L + 6, Yv(prm.P0) - 3);
-    function line(rr, upto, col, w, dash) { g.strokeStyle = col; g.lineWidth = w; g.setLineDash(dash || []); g.beginPath(); for (var i = 0; i <= upto; i++) { var px = X(i), py = Yv(rr[i].D); if (i) g.lineTo(px, py); else g.moveTo(px, py); } g.stroke(); g.setLineDash([]); g.lineWidth = 1; }
-    if (opt.ser) {
-      var cols = ['#5aa2ff', '#3ccf91', '#ff9f43', '#c58bff'];
-      if (document.documentElement.dataset.theme === 'light') cols = ['#1f5fae', '#16875a', '#c8650a', '#7442c8'];
-      var th = 1e10;
-      g.strokeStyle = mut; g.setLineDash([2, 4]); g.beginPath(); g.moveTo(L, Yv(th)); g.lineTo(L + pw, Yv(th)); g.stroke(); g.setLineDash([]);
-      g.fillStyle = mut; g.textAlign = 'right'; g.textBaseline = 'bottom'; g.fillText('detection threshold', L + pw - 4, Yv(th) - 3);
-      series.forEach(function (sr, i) {
-        line(sr.r, cyc, cols[i], 3); line(sr.r, NC, cols[i], 1, [3, 4]);
-        g.fillStyle = cols[i]; g.textAlign = 'left'; g.textBaseline = 'middle';
-        var tc = ct(sr.r, th);
-        g.fillText(sci(sr.n0) + (tc ? ': Ct ' + tc.toFixed(1) : ''), L + pw + 8, T + 14 + 22 * i);
-      });
-      g.fillStyle = mut; g.font = '14px system-ui,Segoe UI,Arial'; g.textAlign = 'left';
-      wrapText(g, '100-fold steps sit about 6.6 cycles apart (2⁶·⁶ ≈ 100), and all reach the same plateau.', L + pw + 8, T + 14 + 22 * 4 + 8, R - 12, 18);
-    } else {
-      var gcol = [gh, gh, gh, gh], gdash = [[2, 3], [8, 4], [3, 6], []];
-      ghosts.forEach(function (gg, i) {
-        var same = (i === 0 && !opt.re && !opt.enz) || (i === 1 && opt.re && !opt.enz) || (i === 2 && !opt.re && opt.enz) || (i === 3 && opt.re && opt.enz);
-        if (same) return;
-        line(gg.r, NC, gcol[i], 1.3, gdash[i]);
-      });
-      // ideal doubling, no ceiling
-      g.strokeStyle = gh; g.setLineDash([1, 5]); g.beginPath(); for (var i = 0; i <= NC; i++) { var vv = prm.N0 * Math.pow(2, i); if (vv > Math.pow(10, Y1 + 0.5) || (!opt.log && vv > ymax)) break; var py = Yv(vv); if (i) g.lineTo(X(i), py); else g.moveTo(X(i), py); } g.stroke(); g.setLineDash([]);
-      line(run, cyc, cur, 3.2); line(run, NC, cur, 1, [4, 4]);
-      g.fillStyle = cur; g.beginPath(); g.arc(X(cyc), Yv(run[cyc].D), 5, 0, 7); g.fill();
-      // legend on the right
-      var ly = T + 6; g.textAlign = 'left'; g.textBaseline = 'middle'; g.font = '14px system-ui,Segoe UI,Arial';
-      function leg(col, dash, w, txt) { g.strokeStyle = col; g.lineWidth = w; g.setLineDash(dash); g.beginPath(); g.moveTo(L + pw + 8, ly); g.lineTo(L + pw + 34, ly); g.stroke(); g.setLineDash([]); g.lineWidth = 1; g.fillStyle = col === gh ? mut : col; ly = wrapText(g, txt, L + pw + 40, ly, R - 42, 16) + 4; }
-      leg(cur, [], 3, 'This tube');
-      leg(gh, [1, 5], 1.3, 'Perfect doubling');
-      ghosts.forEach(function (gg, i) { var same = (i === 0 && !opt.re && !opt.enz) || (i === 1 && opt.re && !opt.enz) || (i === 2 && !opt.re && opt.enz) || (i === 3 && opt.re && opt.enz); if (!same) leg(gh, gdash[i], 1.3, gg.k); });
-      // Taq-limit marker
-      var on = onset(run);
-      if (on !== null) { g.strokeStyle = css('--wait'); g.setLineDash([2, 3]); g.beginPath(); g.moveTo(X(on), T); g.lineTo(X(on), B); g.stroke(); g.setLineDash([]); g.fillStyle = css('--wait'); g.textAlign = 'right'; g.textBaseline = 'top'; g.font = '14px system-ui,Segoe UI,Arial'; g.fillText('Taq can’t keep up →', X(on) - 4, opt.log ? B - 20 : (T + B) / 2); }
-      // fate bars
-      var fy0 = B + gap, fy1 = fy0 + fateH, bw = pw / NC;
-      g.font = '14px system-ui,Segoe UI,Arial'; g.fillStyle = mut; g.textAlign = 'left'; g.textBaseline = 'bottom';
-      g.fillText('What happened to each template strand that cycle', L, fy0 - 4);
-      var cc = css('--copy'), cr = css('--rep'), cw = css('--wait');
-      for (var k = 1; k <= NC; k++) {
-        var f = run[k], x0 = X(k - 1) + 1, ww = bw - 2, al = k <= cyc ? 1 : 0.18;
-        g.globalAlpha = al;
-        var yA = fy1 - fateH * f.copied; g.fillStyle = cc; g.fillRect(x0, yA, ww, fy1 - yA);
-        var yB = yA - fateH * f.wait; g.fillStyle = cw; g.fillRect(x0, yB, ww, yA - yB);
-        g.fillStyle = cr; g.fillRect(x0, fy0, ww, yB - fy0);
-        g.globalAlpha = 1;
-      }
-      g.strokeStyle = mut; g.strokeRect(L, fy0, pw, fateH);
-      g.fillStyle = mut; g.textAlign = 'right'; g.textBaseline = 'middle'; g.fillText('100%', L - 8, fy0 + 6); g.fillText('0', L - 8, fy1 - 4);
-      var ky = fy0 + 4; g.textAlign = 'left';
-      [[cc, 'Copied'], [cw, 'Primed, no Taq free in time'], [cr, 'Re-paired with its partner (no primer landed)']].forEach(function (it) { g.fillStyle = it[0]; g.fillRect(L + pw + 8, ky + 2, 12, 12); g.fillStyle = mut; g.textBaseline = 'top'; ky = wrapText(g, it[1], L + pw + 26, ky, R - 28, 16) + 4; });
-    }
-    renderSide(); renderVig();
-  }
-  function wrapText(ctx, txt, x, y, w, lh) { var words = txt.split(' '), ln = ''; words.forEach(function (wd) { var t2 = ln ? ln + ' ' + wd : wd; if (ctx.measureText(t2).width > w && ln) { ctx.fillText(ln, x, y); y += lh; ln = wd; } else ln = t2; }); if (ln) ctx.fillText(ln, x, y); return y + lh; }
-
-  // ---- side panel ----
-  function phase(f, c) {
-    if (c === 0) return ['Before cycle 1', 'One picogram of a 5 kb plasmid is about 2 × 10⁵ copies. The tube holds about 10¹² of each primer, 10¹⁵ of each dNTP and 10¹⁰ Taq. Press Play or →.'];
-    if (opt.ser) return ['Dilution series', 'Every tube follows the same rules, so smaller starts cross the threshold later (higher Ct) but flatten at the same height: the plateau is set by the tube, not by the start.'];
-    if (f.copied > 0.9) return ['Doubling', 'Almost every strand gets a primer, and there is plenty of Taq to finish it. Copies roughly double each cycle.'];
-    if (f.copied < 0.05) return ['Plateau', 'Nearly every strand re-pairs with its partner before a primer can land, and primers are running down. Each cycle adds almost nothing. The dNTPs are barely touched.'];
-    if (f.wait >= f.rep) return ['Taq can’t keep up', 'There are more primed strands than the Taq can finish in one extension step (Taq × 50 nt/s × extension time ÷ length). Each cycle adds about the same number of copies instead of doubling.'];
-    return ['Strands re-pair', 'Product is now so concentrated that on cooling, many strands find their own partner before a primer can land. They zip back up and are not copied this cycle.'];
-  }
-  function bar(id, frac) { document.getElementById(id).style.width = Math.max(0, Math.min(100, frac * 100)) + '%'; }
-  function renderSide() {
-    var f = run[cyc], ph = phase(f, cyc);
-    document.getElementById('cyc').textContent = 'Cycle ' + cyc + ' of ' + NC + (opt.ser ? '' : (cyc ? ': ' + pct(f.copied) + ' of strands copied' : ''));
-    document.getElementById('stTitle').textContent = ph[0];
-    document.getElementById('stText').textContent = ph[1];
-    document.getElementById('meters').style.display = opt.ser ? 'none' : ''; document.getElementById('vigCard').style.display = opt.ser ? 'none' : '';
-    bar('mCopy', Math.log10(f.D / prm.N0) / Math.log10(prm.P0 / prm.N0)); document.getElementById('vCopy').textContent = sci(f.D);
-    bar('mPri', 1 - f.P / prm.P0); document.getElementById('vPri').textContent = pct(1 - f.P / prm.P0);
-    bar('mNtp', f.ntp / NTP0); document.getElementById('vNtp').textContent = pct(f.ntp / NTP0);
-    var load = cyc ? f.primed / f.cap : 0; bar('mTaq', load); document.getElementById('vTaq').textContent = cyc ? (load > 1 ? 'over: ' + load.toFixed(1) + '×' : pct(load)) : '-';
-  }
-  // ---- vignette: 10 duplexes go through melt, cool, extend for the current cycle ----
-  function renderVig() {
-    var s = fit(vg, h), W = s.w, Hh = s.h; h.clearRect(0, 0, W, Hh);
-    var mut = css('--muted'), ink = css('--ink');
-    h.font = '13px system-ui,Segoe UI,Arial'; h.textBaseline = 'top'; h.fillStyle = mut;
-    if (opt.ser || cyc === 0) { h.fillText(opt.ser ? 'Dilution series: see the curves.' : 'Each cycle: 95 °C melt, cool to ~60 °C (primers land), 72 °C Taq extends.', 4, 4); if (cyc === 0 && !opt.ser) drawRows(0, {copied: 1, rep: 0, wait: 0}, W, Hh); return; }
-    var a = anim, stage = a < 0.3 ? '95 °C: strands separate' : a < 0.6 ? 'Cooling: partner or primer?' : '72 °C: Taq extends';
-    h.fillText('Cycle ' + cyc + ' (10 of the duplexes): ' + stage, 4, 4);
-    drawRows(a, run[cyc], W, Hh);
-  }
-  function drawRows(a, f, W, Hh) {
-    var N = 10, top = 24, rowH = (Hh - top - 4) / N, x0 = 10, x1 = W - 10, len = x1 - x0;
-    var nRep = Math.round(f.rep * N), nWaitStr = Math.round(f.wait * 2 * N);
-    var cC = css('--copy'), cR = css('--rep'), cW = css('--wait'), ink = css('--muted');
-    var sep = a < 0.3 ? a / 0.3 : 1;
-    var waitLeft = nWaitStr;
-    for (var i = 0; i < N; i++) {
-      var y = top + rowH * (i + 0.5), rep = i >= N - nRep;
-      var d = rep ? (a < 0.3 ? sep : a < 0.6 ? 1 - (a - 0.3) / 0.3 : 0) : sep;
-      var gapPx = 2 + d * (rowH * 0.32);
-      h.lineWidth = 2; h.strokeStyle = rep && a >= 0.3 ? cR : ink;
-      h.beginPath(); h.moveTo(x0, y - gapPx / 2); h.lineTo(x1, y - gapPx / 2); h.moveTo(x0, y + gapPx / 2); h.lineTo(x1, y + gapPx / 2); h.stroke();
-      if (rep || a < 0.3) continue;
-      // two strands, each primed at its 3' end (top copies left to right, bottom right to left)
-      [[-1, x0, 1], [1, x1, -1]].forEach(function (sd) {
-        var yy = y + sd[0] * (gapPx / 2 + 3), waits = false;
-        if (waitLeft > 0) { waits = true; waitLeft--; }
-        var ext = a < 0.6 ? 0 : waits ? 0 : (a - 0.6) / 0.4;
-        var pl = len * 0.08, el = pl + (len - pl) * ext;
-        h.strokeStyle = waits ? cW : cC; h.lineWidth = 2.5;
-        h.beginPath(); h.moveTo(sd[1], yy); h.lineTo(sd[1] + sd[2] * el, yy); h.stroke();
-      });
-    }
-    h.lineWidth = 1;
-  }
-
-  // ---- controls ----
-  function setCyc(c) { cyc = Math.max(0, Math.min(NC, c)); document.getElementById('scrub').value = cyc; render(); }
-  function step(dn) { anim = 0; setCyc(cyc + dn); if (dn < 0) anim = 1, render(); }
-  function play(on) { playing = on === undefined ? !playing : on; document.getElementById('bPlay').textContent = playing ? 'Pause (Space)' : 'Play (Space)'; if (playing) { if (cyc >= NC) setCyc(0); lastTs = 0; requestAnimationFrame(tick); } }
-  var CYC_SEC = 0.9;
-  function tick(ts) {
-    if (!playing) return;
-    if (!lastTs) lastTs = ts; var dt = (ts - lastTs) / 1000; lastTs = ts;
-    anim += dt / CYC_SEC;
-    if (anim >= 1.25) { if (cyc >= NC) { anim = 1; play(false); render(); return; } anim = 0; cyc++; document.getElementById('scrub').value = cyc; render(); }
-    else if (anim <= 1) renderVig();
-    requestAnimationFrame(tick);
-  }
-  function tog(id, key, labOn, labOff) { opt[key] = !opt[key]; var b = document.getElementById(id); b.setAttribute('aria-pressed', opt[key]); b.textContent = opt[key] ? labOn : labOff; recompute(); render(); }
-  function light() { var r = document.documentElement; r.dataset.theme = r.dataset.theme === 'light' ? 'dark' : 'light'; document.getElementById('bLight').textContent = r.dataset.theme === 'light' ? 'Dark (L)' : 'Light (L)'; render(); }
-  function full() { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); }
-  document.getElementById('bPlay').onclick = function () { play(); };
-  document.getElementById('bNext').onclick = function () { play(false); step(1); };
-  document.getElementById('bBack').onclick = function () { play(false); step(-1); };
-  document.getElementById('bReset').onclick = function () { play(false); anim = 1; setCyc(0); };
-  document.getElementById('scrub').oninput = function (e) { play(false); anim = 1; setCyc(+e.target.value); };
-  document.getElementById('bRe').onclick = function () { tog('bRe', 're', 'Re-pairing on (A)', 'Re-pairing off (A)'); };
-  document.getElementById('bEnz').onclick = function () { tog('bEnz', 'enz', 'Taq limit on (E)', 'Taq limit off (E)'); };
-  document.getElementById('bLog').onclick = function () { tog('bLog', 'log', 'Log axis (G)', 'Linear axis (G)'); };
-  document.getElementById('bSer').onclick = function () { tog('bSer', 'ser', 'Dilution series (S)', 'Dilution series (S)'); };
-  document.getElementById('bLight').onclick = light;
-  document.getElementById('bFull').onclick = full;
-  cv.addEventListener('click', function (e) { var r = cv.getBoundingClientRect(), L = 100, pw = r.width - 100 - (opt.ser ? 190 : 150), c = Math.round((e.clientX - r.left - L) / pw * NC); if (c >= 0 && c <= NC) { play(false); anim = 1; setCyc(c); } });
-  var KN = {
-    kN0: function (v) { prm.N0 = Math.pow(10, v); return sci(prm.N0); },
-    kE: function (v) { prm.E = Math.pow(10, v); return sci(prm.E); },
-    kT: function (v) { prm.t = v; return v + ' s'; },
-    kL: function (v) { prm.L = v; return v + ' bp'; },
-    kP: function (v) { prm.P0 = Math.pow(10, v); return sci(prm.P0); }
-  };
-  Object.keys(KN).forEach(function (id) { var el = document.getElementById(id); function upd() { document.getElementById('v' + id.slice(1)).textContent = KN[id](+el.value); } upd(); el.oninput = function () { upd(); recompute(); render(); }; });
-  document.addEventListener('keydown', function (e) {
-    if (e.target.tagName === 'INPUT' && e.target.type === 'range' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) return;
-    var k = e.key;
-    if (k === ' ') { e.preventDefault(); play(); }
-    else if (k === 'ArrowRight') { play(false); step(1); }
-    else if (k === 'ArrowLeft') { play(false); step(-1); }
-    else if (k === 'r' || k === 'R') document.getElementById('bReset').click();
-    else if (k === 'a' || k === 'A') document.getElementById('bRe').click();
-    else if (k === 'e' || k === 'E') document.getElementById('bEnz').click();
-    else if (k === 'g' || k === 'G') document.getElementById('bLog').click();
-    else if (k === 's' || k === 'S') document.getElementById('bSer').click();
-    else if (k === 'l' || k === 'L') light();
-    else if (k === 'f' || k === 'F') full();
-  });
-  window.addEventListener('resize', render);
-  var q = /[?&]c=(\d+)/.exec(location.search); if (q) cyc = Math.min(NC, +q[1]);
-  if (/[?&]log=1/.test(location.search)) { opt.log = true; document.getElementById('bLog').setAttribute('aria-pressed', 'true'); document.getElementById('bLog').textContent = 'Log axis (G)'; }
-  if (/[?&]light=1/.test(location.search)) { document.documentElement.dataset.theme = 'light'; document.getElementById('bLight').textContent = 'Dark (L)'; }
-  if (/[?&]series=1/.test(location.search)) { opt.ser = true; document.getElementById('bSer').setAttribute('aria-pressed', 'true'); }
-  recompute(); document.getElementById('scrub').value = cyc; render();
-
-  // ---- self-test ----
-  window.PCRTEST = function () {
-    var f = [], P = {N0: 2e5, E: 1e10, t: 60, L: 200, P0: 1e12, r: 3}, both = {re: true, enz: true};
-    var d = sim(P, both, 60);
-    // (a) Taq limit starts near cycle 20 for 1 pg of a 5 kb plasmid (slide: "after ~20 cycles")
-    var on = onset(d); if (on === null || on < 17 || on > 21) f.push('(a) Taq-limit onset ' + on);
-    // (b) a 100-fold dilution shifts Ct by about log2(100) = 6.64 cycles
-    var cts = SERIES.map(function (n0) { return ct(sim(Object.assign({}, P, {N0: n0}), both, 60), 1e10); });
-    for (var i = 1; i < cts.length; i++) if (Math.abs(cts[i] - cts[i - 1] - 6.64) > 0.3) f.push('(b) Ct step ' + (cts[i] - cts[i - 1]).toFixed(2));
-    // (c) the plateau does not depend on the start: all four within 5% by cycle 60
-    var ends = SERIES.map(function (n0) { return sim(Object.assign({}, P, {N0: n0}), both, 60)[60].D; });
-    if (Math.max.apply(null, ends) / Math.min.apply(null, ends) > 1.05) f.push('(c) plateaus differ');
-    // (d) re-pairing matters: with Taq unlimited, switching it off changes cycle 24 by > 25%; it takes > half the strands by cycle 25; off, none re-pair while primers last
-    var rOn = sim(P, {re: true, enz: false}, 40), rOff = sim(P, {re: false, enz: false}, 40);
-    if (rOff[24].D / rOn[24].D < 1.25) f.push('(d) re-pairing effect small');
-    if (d[25].rep < 0.5 || rOff[20].rep !== 0) f.push('(d) re-pair share ' + d[25].rep.toFixed(2));
-    // (e) the Taq limit matters: without re-pairing it holds cycle 21 > 30% below no brakes, and leaves strands waiting
-    var eOn = sim(P, {re: false, enz: true}, 40);
-    if (eOn[21].D > 0.7 * rOff[21].D) f.push('(e) Taq effect small');
-    var mw = Math.max.apply(null, d.map(function (x) { return x.wait; })); if (mw < 0.1 || rOn.some(function (x) { return x.wait > 0; })) f.push('(e) waiting share ' + mw.toFixed(2));
-    // (f) bookkeeping: primers used = new strands / 2; never negative; fates sum to 1; copies never fall and never beat doubling
-    [d, rOn, rOff, eOn].forEach(function (rr) { rr.forEach(function (x, i) {
-      if (Math.abs((P.P0 - x.P) - (x.D - P.N0)) > 1e-6 * P.P0) f.push('(f) primer balance at ' + i);
-      if (x.P < -1) f.push('(f) primers negative at ' + i);
-      if (i && Math.abs(x.copied + x.rep + x.wait - 1) > 1e-9) f.push('(f) fates at ' + i);
-      if (i && (x.D < rr[i - 1].D - 1e-3 || x.D > 2 * rr[i - 1].D * (1 + 1e-12))) f.push('(f) growth at ' + i);
-    }); });
-    // (g) dNTPs are not what stops it at 200 bp: under 15% of the pool used by cycle 40, and never over 100% at 2 kb
-    if (sim(Object.assign({}, P, {L: 2000}), both, 60).some(function (x) { return x.ntp > NTP0 * (1 + 1e-9); })) f.push('(g) dNTP overdrawn');
-    if (d[40].ntp / NTP0 > 0.15) f.push('(g) dNTP ' + d[40].ntp / NTP0);
-    // (h) a plateau: the last 5 of 40 cycles add under 5% at the defaults
-    if (d[40].D / d[35].D > 1.05) f.push('(h) still rising ' + (d[40].D / d[35].D).toFixed(3));
-    return {fails: f, onset: on, cts: cts.map(function (x) { return +x.toFixed(2); })};
-  };
-  if (/[?&]test=1/.test(location.search)) { var pre = document.createElement('pre'); pre.id = 'testout'; pre.textContent = JSON.stringify(window.PCRTEST()); document.body.appendChild(pre); }
-})();
+// Edit this list to add, remove or relabel demos. "href" is the demo's folder next to this page.
+// course: the class it is used in (leave '' to show only the topic); topic: what it is about.
+var DEMOS = [
+  {href: 'stacking-gel/', img: 'thumbs/stacking-gel.jpg', course: 'BMSC 240', topic: 'Electrophoresis', title: 'Stacking gel: a rolling start for proteins', blurb: 'Discontinuous SDS-PAGE: chloride leads, glycine trails, and every load squeezes into the same thin band before the running gel. Side by side with a one-gel run.'},
+  {href: 'two-d-page/', img: 'thumbs/two-d-page.jpg', course: 'BMSC 240', topic: 'Electrophoresis', title: '2-D PAGE: focus by pI, then separate by size', blurb: 'Isoelectric focusing, with a kick past the pI that flips the charge and pulls the protein back; then SDS and a second gel sort by size.'},
+  {href: 'pcr-plateau/', img: 'thumbs/pcr-plateau.jpg', course: 'BMSC 240', topic: 'PCR', title: 'PCR plateau: why amplification stops', blurb: 'Copies per tube by cycle: Taq runs short near cycle 20 and strands re-pair with their partners, so the curve flattens. Includes a 100-fold dilution series.'},
+  {href: 'blue-white-screening/', img: 'thumbs/blue-white-screening.jpg', course: 'BMSC 240', topic: 'Cloning', title: 'Blue-white screening: alpha complementation', blurb: 'How lacZ alpha from the plasmid and omega from the host make a working enzyme, why an insert gives a white colony, and why alpha is so small.'},
+  {href: 'sec-fraction-size/', img: 'thumbs/sec-fraction-size.jpg', course: 'BMSC 240', topic: 'Protein purification', title: 'Size exclusion: big fractions hide peaks', blurb: 'The same column collected in 2, 5, 10 or 20 fractions: coarse fractions blur separate peaks into one.'},
+  {href: 'enzyme-inhibition-mm-lb/', img: 'thumbs/enzyme-inhibition-mm-lb.jpg', course: 'BMSC 240', topic: 'Enzyme kinetics', title: 'Michaelis-Menten and Lineweaver-Burk with inhibitors', blurb: 'A simulated assay with and without inhibitor: which type moves Km and Vmax, and where the double-reciprocal lines meet.'},
+  {href: 'fret/', img: 'thumbs/fret.jpg', course: 'BMSC 240', topic: 'Fluorescence', title: 'FRET: spectral overlap, distance, and two uses', blurb: 'Drag the acceptor spectrum to change the overlap, drag the dyes apart to watch efficiency fall with the sixth power of distance, then see FRET report protein contact and a change of shape.'},
+  {href: 'hlh-dimer-ebox/', img: 'thumbs/hlh-dimer-ebox.jpg', course: '', topic: 'Gene regulation', title: 'HLH homodimer reading E-boxes', blurb: 'A basic helix-loop-helix dimer reads the two half-sites of an E-box; change the site, spacing and protein class and watch binding respond.'},
+  {href: 'dna-protein-3d/', img: 'thumbs/dna-protein-3d.jpg', course: '', topic: 'DNA-protein recognition', title: 'B-DNA and a protein in 3-D', blurb: 'Rotate B-DNA, dock a protein in the major groove, and see which contacts hold it there.'}
+];
+var grid = document.getElementById('grid'), filt = document.getElementById('filters'), pick = 'All';
+function esc(s) { return s.replace(/[&<>"]/g, function (c) { return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]; }); }
+function draw() {
+  grid.innerHTML = DEMOS.filter(function (d) { return pick === 'All' || d.course === pick; }).map(function (d) {
+    return '<a class="card" href="' + esc(d.href) + '"><img src="' + esc(d.img) + '" alt="Screenshot of ' + esc(d.title) + '" loading="lazy"><div class="body"><span class="tags">' + (d.course ? '<span class="course">' + esc(d.course) + '</span>' : '') + '<span class="topic">' + esc(d.topic) + '</span></span><h2>' + esc(d.title) + '</h2><p>' + esc(d.blurb) + '</p></div></a>';
+  }).join('');
+  var courses = ['All'].concat(DEMOS.map(function (d) { return d.course; }).filter(function (c, i, a) { return c && a.indexOf(c) === i; }));
+  filt.style.display = courses.length > 2 ? '' : 'none';
+  filt.innerHTML = courses.map(function (c) { return '<button aria-pressed="' + (c === pick) + '">' + esc(c) + '</button>'; }).join('');
+  Array.prototype.forEach.call(filt.children, function (b) { b.onclick = function () { pick = b.textContent; draw(); }; });
+}
+draw();
 </script>
 </body>
 </html>
