@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2-D PAGE: focus by pI, then separate by size</title>
+<style>
+:root{--bg:#0f141b;--panel:#161d27;--ink:#e8edf3;--muted:#9fb0c3;--line:#2c3746;--frame:#8d99a8;--slab:#1d2a3a;--strip:#2a2440;--pos:#ff6b6b;--neg:#5aa2ff;--zero:#c9d1db}
+[data-theme=light]{--bg:#f7f8fa;--panel:#ffffff;--ink:#16202c;--muted:#4a5a6c;--line:#cfd7e1;--frame:#6f7b89;--slab:#eef2f7;--strip:#e6e1f0;--pos:#c0392b;--neg:#1f5fae;--zero:#4a5a6c}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:18px/1.35 system-ui,Segoe UI,Roboto,Arial,sans-serif;display:flex;flex-direction:column;overflow:hidden}
+header{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;padding:10px 20px 2px}
+h1{font-size:26px;margin:0}
+.sub{color:var(--muted);font-size:16px}
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:6px 20px 6px;font-size:16px}
+button{font:inherit;font-size:16px;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:4px 11px;cursor:pointer}
+button[aria-pressed=true]{outline:2px solid var(--neg)}
+button:disabled{opacity:.45;cursor:default}
+input[type=range]{flex:1;min-width:140px}
+main{flex:1;min-height:0;display:flex;gap:12px;padding:0 20px 6px}
+#stage{flex:1;min-width:0;position:relative}
+#cv{position:absolute;inset:0;width:100%;height:100%}
+aside{width:380px;flex:none;display:flex;flex-direction:column;gap:10px;overflow:hidden}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+.steps{display:flex;gap:6px;margin-bottom:8px}
+.steps i{flex:1;height:6px;border-radius:3px;background:var(--line)}
+.steps i.on{background:var(--neg)}
+#stTitle{font-size:20px;font-weight:700;margin:0 0 4px}
+#stText{font-size:17px;margin:0}
+.pick{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+.pick button{padding:2px 9px;font-size:15px}
+.pick i{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+#who{font-size:16px;margin:2px 0 4px}
+#mini{width:100%;height:150px;display:block}
+.foot{color:var(--muted);font-size:14px;padding:0 20px 8px;margin:0}
+</style>
+<script type="application/json" id="demo-meta">{"title":"2-D PAGE: focus by pI, then separate by size","course":"BMSC 240 (Module 7: protein electrophoresis)","summary":"Isoelectric focusing then SDS-PAGE. Each protein drifts toward its pI: positive below it and pulled toward the cathode, negative above it and pulled toward the anode. Kick one past its pI and watch its charge flip and pull it back. Then SDS makes everything negative and the second gel sorts by size."}</script>
+</head>
+<body>
+<header>
+  <h1>2-D PAGE: focus by pI, then separate by size</h1>
+  <span class="sub">Dimension 1: isoelectric focusing (left to right). Dimension 2: SDS-PAGE (top to bottom).</span>
+</header>
+<div class="bar">
+  <button id="bPlay" title="Space">Play (Space)</button>
+  <button id="bBack" title="Left arrow">&#8592; Back</button>
+  <button id="bNext" title="Right arrow">Next &#8594;</button>
+  <button id="bReset" title="R">Reset (R)</button>
+  <input id="scrub" type="range" min="0" max="1000" value="0" aria-label="time">
+  <button id="bKickL" title="J">&#8592; Kick acidic (J)</button>
+  <button id="bKickR" title="K">Kick basic (K) &#8594;</button>
+  <button id="bArrows" aria-pressed="false" title="V">Arrows on all (V)</button>
+  <button id="bLight" title="L">Light (L)</button>
+  <button id="bFull" title="F">Full screen (F)</button>
+</div>
+<main>
+  <div id="stage"><canvas id="cv"></canvas></div>
+  <aside>
+    <div class="card">
+      <div class="steps" id="steps"></div>
+      <p id="stTitle"></p>
+      <p id="stText"></p>
+    </div>
+    <div class="card">
+      <div class="pick" id="pick"></div>
+      <p id="who"></p>
+      <canvas id="mini" aria-label="net charge against pH for the tracked protein"></canvas>
+    </div>
+  </aside>
+</main>
+<p class="foot">Net charge is drawn as a smooth curve that crosses zero at the pI; real titration curves have steps from each ionisable group. Molecules wander by diffusion; any that wander past their pI change sign and are pulled back, which is what keeps a focused band thin. The kick buttons push the tracked protein past its pI by hand. Real focusing takes 12 to 72 hours; here it takes seconds. Proteins are drawn as if visible. Six made-up proteins: A and D are the same size, and B and F have the same pI.</p>
+<script>
+(function () {
+  'use strict';
+  // ---- proteins (made up): pI, kDa ----
+  var P = [
+    {id: 'A', pI: 4.6, kda: 66, c: '#e8a33d'},
+    {id: 'B', pI: 5.5, kda: 45, c: '#c86bd6'},
+    {id: 'C', pI: 6.3, kda: 29, c: '#4cc38a'},
+    {id: 'D', pI: 7.1, kda: 66, c: '#f06a6a'},
+    {id: 'E', pI: 8.2, kda: 16, c: '#46b6d8'},
+    {id: 'F', pI: 5.5, kda: 21, c: '#d9d04a'}
+  ];
+  var PH0 = 3, PH1 = 9;              // strip, anode (+) at pH 3, cathode (-) at pH 9 (Kyle's slide 29)
+  var MU = 0.3, KQ = 1.2, D = 0.00225, DT = 0.05, NM = 28;
+  var T_IEF = 36, T_SDS = T_IEF + 5, T_MOVE = T_SDS + 5, T_END = T_MOVE + 28;
+  function q(pH, pI) { return Math.tanh(KQ * (pI - pH)); } // net charge (scaled): + below pI, - above
+  function rf(k) { return Math.min(0.95, 2.177 - 1.02 * Math.log10(k)); } // 12% gel, as in stacking-gel
+
+  // ---- seeded simulation of focusing ----
+  var seed, M, simT, kicks;
+  function rnd() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
+  function gauss() { var u = Math.max(1e-12, rnd()), v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(6.2832 * v); }
+  function init() {
+    seed = 20261028; M = []; simT = 0; kicks = [];
+    P.forEach(function (p, pi) {
+      for (var j = 0; j < NM; j++) M.push({p: pi, x: PH0 + 0.15 + (PH1 - PH0 - 0.3) * rnd(), sy: rnd(), jx: gauss(), jy: gauss()});
+    });
+  }
+  function step() {
+    var s = Math.sqrt(2 * D * DT);
+    M.forEach(function (m) {
+      var v = MU * q(m.x, P[m.p].pI); // + charge drifts toward the cathode (higher pH)
+      m.x = Math.min(PH1 - 0.02, Math.max(PH0 + 0.02, m.x + v * DT + s * gauss()));
+    });
+    simT += DT;
+  }
+  function simTo(tt) { tt = Math.min(tt, T_IEF); if (tt < simT - 1e-9) init(); while (simT < tt - 1e-9) step(); }
+  function kick(dir) {
+    if (t >= T_IEF || t <= 0.5) return;
+    M.forEach(function (m) { if (m.p === track) m.x = Math.min(PH1 - 0.05, Math.max(PH0 + 0.05, P[m.p].pI + dir * (1.1 + 0.15 * Math.abs(m.jx)))); });
+    // let it come back: the sim runs on while the stage clock holds, so a kick works at any point in focusing
+    playing = false; target = null; kickLeft = 10; kickLast = null;
+    if (reduce) { for (var i = 0; i < 10 / DT; i++) stepNoClock(); kickLeft = 0; render(); return; }
+    requestAnimationFrame(kickTick);
+  }
+  var kickLeft = 0, kickLast = null;
+  function kickTick(now) {
+    if (kickLeft <= 0) return;
+    if (kickLast !== null) { var n = Math.max(1, Math.round(RATE * Math.min(0.1, (now - kickLast) / 1000) / DT)); for (var i = 0; i < n && kickLeft > 0; i++) { stepNoClock(); kickLeft -= DT; } }
+    kickLast = now; render();
+    if (kickLeft > 0) requestAnimationFrame(kickTick);
+  }
+  function stepNoClock() { var keep = simT; step(); simT = keep; }
+
+  // ---- stages ----
+  var STAGES = [
+    {t: 0, title: 'Loaded on the strip', text: 'Ampholytes hold a fixed pH gradient, 3 at the + end to 9 at the − end. The protein mixture soaks in all along the strip.'},
+    {t: 3, title: 'Power on', text: 'Below its pI a protein carries a net + charge and is pulled toward the − electrode, up the pH gradient. Above its pI it is − and is pulled back toward +. Either way it heads for its pI.'},
+    {t: 24, title: 'Focused at the pI', text: 'At its pI the net charge is zero, so the protein stops. Molecules that wander past it flip sign and are pulled back. Try the kick buttons on the tracked protein.'},
+    {t: T_IEF + 3, title: 'Soak in SDS', text: 'The strip is treated with SDS. Every protein is now coated and negative, so pI no longer matters.'},
+    {t: T_MOVE, title: 'Strip onto the SDS gel', text: 'The strip is laid along the top of an SDS gel, + at the bottom. Now everything runs down.'},
+    {t: T_END, title: 'Two dimensions', text: 'Across: pI. Down: size. A and D are the same size but split across; B and F share a pI but split down. One dimension alone would have merged each pair.'}
+  ];
+  function stageAt(tt) { var s = 0; for (var i = 0; i < STAGES.length; i++) if (tt >= STAGES[i].t - 1e-6) s = i; return s; }
+  var t = 0, playing = false, target = null, track = 3, arrowsAll = false;
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---- drawing ----
+  var cv = document.getElementById('cv'), ctx = cv.getContext('2d'), G = {};
+  function css(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+  function layout() {
+    var r = cv.parentNode.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    G.w = r.width; G.h = r.height;
+    G.L = 92; G.R = G.w - 70; G.sh = Math.max(34, Math.min(54, G.h * 0.08));
+    G.s0 = 46; // strip top at the start
+    G.gt = G.s0 + G.sh + 70; G.gb = G.h - 34; // SDS gel
+  }
+  function X(pH) { return G.L + (G.R - G.L) * (pH - PH0) / (PH1 - PH0); }
+  function text(s, x, y, al, col, size, bold) { ctx.fillStyle = col || css('--ink'); ctx.font = (bold ? '700 ' : '') + (size || 16) + 'px system-ui,Segoe UI,Arial'; ctx.textAlign = al || 'left'; ctx.fillText(s, x, y); }
+  function electrode(x, y, sign) { var c = sign === '+' ? css('--pos') : css('--neg'); ctx.strokeStyle = c; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 12, 0, 6.29); ctx.stroke(); text(sign, x, y + 6, 'center', c, 19, true); }
+  function stripTop(tt) { var f = Math.max(0, Math.min(1, (tt - T_SDS) / (T_MOVE - T_SDS))); f = f * f * (3 - 2 * f); return G.s0 + f * (G.gt - G.sh - G.s0); }
+  function arrow(x, y, dx, col) {
+    if (Math.abs(dx) < 2) return;
+    ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 2.2;
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + dx, y); ctx.stroke();
+    var s = dx > 0 ? 1 : -1; ctx.beginPath(); ctx.moveTo(x + dx + 6 * s, y); ctx.lineTo(x + dx, y - 4); ctx.lineTo(x + dx, y + 4); ctx.fill();
+  }
+  function draw() {
+    layout(); ctx.clearRect(0, 0, G.w, G.h);
+    var st = stripTop(t), sdsF = Math.max(0, Math.min(1, (t - T_IEF) / (T_SDS - T_IEF)));
+    var run = Math.max(0, Math.min(1, (t - T_MOVE) / (T_END - T_MOVE)));
+    // SDS gel
+    ctx.fillStyle = css('--slab'); ctx.fillRect(G.L, G.gt, G.R - G.L, G.gb - G.gt);
+    ctx.strokeStyle = css('--frame'); ctx.lineWidth = 2; ctx.strokeRect(G.L, G.gt, G.R - G.L, G.gb - G.gt);
+    text('SDS gel, 12%', G.L - 10, G.gt + 20, 'right', css('--muted'), 14);
+    if (t >= T_MOVE) { electrode(G.R + 34, G.gt - 4, '−'); electrode(G.R + 34, G.gb - 10, '+'); }
+    // size axis at the end
+    if (run >= 1) [66, 45, 29, 21, 16].forEach(function (k) { var y = G.gt + rf(k) * (G.gb - G.gt); text(k + ' kDa', G.L - 10, y + 5, 'right', css('--ink'), 14); ctx.strokeStyle = css('--line'); ctx.beginPath(); ctx.moveTo(G.L - 6, y); ctx.lineTo(G.L, y); ctx.stroke(); });
+    // strip with pH gradient
+    var grd = ctx.createLinearGradient(G.L, 0, G.R, 0);
+    grd.addColorStop(0, '#d7473c'); grd.addColorStop(0.5, '#e9c84a'); grd.addColorStop(1, '#3f6fd8');
+    ctx.globalAlpha = 0.28 * (1 - 0.5 * sdsF); ctx.fillStyle = grd; ctx.fillRect(G.L, st, G.R - G.L, G.sh); ctx.globalAlpha = 1;
+    if (sdsF > 0) { ctx.globalAlpha = 0.25 * sdsF; ctx.fillStyle = css('--neg'); ctx.fillRect(G.L, st, G.R - G.L, G.sh); ctx.globalAlpha = 1; }
+    ctx.strokeStyle = css('--frame'); ctx.lineWidth = 2; ctx.strokeRect(G.L, st, G.R - G.L, G.sh);
+    for (var ph = PH0; ph <= PH1; ph++) { text(String(ph), X(ph), st - 8, 'center', css('--ink'), 15, true); }
+    text('pH', G.L - 30, st - 8, 'center', css('--muted'), 14);
+    if (t < T_MOVE) { electrode(G.L - 30, st + G.sh / 2, '+'); electrode(G.R + 30, st + G.sh / 2, '−'); text('anode', G.L - 30, st + G.sh / 2 + 32, 'center', css('--muted'), 13); text('cathode', G.R + 30, st + G.sh / 2 + 32, 'center', css('--muted'), 13); }
+    // molecules
+    var showArrows = t > 0 && t < T_IEF;
+    // spot shape: give each spot the same spread down as it has across, so spots come out round
+    var sdx = P.map(function (p, pi) { var xs = M.filter(function (m) { return m.p === pi; }).map(function (m) { return X(m.x) + 1.2 * m.jx; }), mu = xs.reduce(function (a, b) { return a + b; }, 0) / xs.length; return Math.sqrt(xs.reduce(function (a, b) { return a + (b - mu) * (b - mu); }, 0) / xs.length); });
+    M.forEach(function (m) {
+      var p = P[m.p], x = X(m.x), tr = m.p === track, r = tr ? 5.5 : 3.6, y;
+      if (t < T_MOVE) y = st + 6 + m.sy * (G.sh - 12);
+      else y = G.gt + run * rf(p.kda) * (G.gb - G.gt) + (run > 0 ? sdx[m.p] * m.jy * Math.sqrt(run) : (m.sy - 0.5) * 4);
+      if (t >= T_MOVE) y = Math.min(y, G.gb - r - 2);
+      var xx = t >= T_IEF ? x + 1.2 * m.jx : x;
+      if (t >= T_MOVE && run > 0) { ctx.globalAlpha = 0.25; ctx.fillStyle = p.c; ctx.beginPath(); ctx.arc(xx, y, r + 5, 0, 6.29); ctx.fill(); ctx.globalAlpha = 1; }
+      ctx.fillStyle = p.c; ctx.beginPath(); ctx.arc(xx, y, r, 0, 6.29); ctx.fill();
+      if (tr && t < T_MOVE) { ctx.strokeStyle = css('--ink'); ctx.lineWidth = 1.5; ctx.stroke(); }
+      if (showArrows && (tr || arrowsAll)) {
+        var qq = q(m.x, p.pI);
+        arrow(xx, y, 26 * qq, qq > 0 ? css('--pos') : css('--neg'));
+      }
+    });
+    // tracked protein's pI marker
+    if (t < T_IEF) { var pt = P[track], xp = X(pt.pI); ctx.setLineDash([4, 4]); ctx.strokeStyle = pt.c; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(xp, st - 4); ctx.lineTo(xp, st + G.sh + 14); ctx.stroke(); ctx.setLineDash([]); text('pI of ' + pt.id + ' = ' + pt.pI, xp, st + G.sh + 30, 'center', pt.c, 14, true); }
+    // labels at the end
+    if (run >= 1) P.forEach(function (p, pi) {
+      var xs = M.filter(function (m) { return m.p === pi; }).map(function (m) { return X(m.x); });
+      var xm = xs.reduce(function (a, b) { return a + b; }, 0) / xs.length, y = G.gt + rf(p.kda) * (G.gb - G.gt);
+      text(p.id, xm + 14, y - 8, 'left', css('--ink'), 16, true);
+    });
+    if (t < T_MOVE) text('waits for the strip', (G.L + G.R) / 2, (G.gt + G.gb) / 2, 'center', css('--muted'), 16);
+  }
+  // mini plot: net charge vs pH for the tracked protein, with its molecules on the curve
+  var mc = document.getElementById('mini'), mx = mc.getContext('2d');
+  function drawMini() {
+    var r = mc.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    mc.width = Math.round(r.width * dpr); mc.height = Math.round(r.height * dpr); mx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var w = r.width, h = r.height, l = 34, rr = 8, tp = 8, bt = 24, p = P[track];
+    function x(ph) { return l + (w - l - rr) * (ph - PH0) / (PH1 - PH0); }
+    function y(v) { return tp + (h - tp - bt) * (1 - v) / 2; }
+    mx.clearRect(0, 0, w, h);
+    mx.strokeStyle = css('--line'); mx.lineWidth = 1; mx.beginPath(); mx.moveTo(l, y(0)); mx.lineTo(w - rr, y(0)); mx.stroke();
+    mx.font = '13px system-ui,Segoe UI,Arial'; mx.fillStyle = css('--muted'); mx.textAlign = 'center';
+    for (var ph = PH0; ph <= PH1; ph++) mx.fillText(ph, x(ph), h - 6);
+    mx.textAlign = 'right'; mx.fillStyle = css('--pos'); mx.fillText('+', l - 8, y(0.85) + 5); mx.fillStyle = css('--zero'); mx.fillText('0', l - 8, y(0) + 5); mx.fillStyle = css('--neg'); mx.fillText('−', l - 8, y(-0.85) + 5);
+    var sds = t >= T_IEF;
+    mx.strokeStyle = p.c; mx.lineWidth = 2.5; mx.beginPath();
+    for (var i = 0; i <= 120; i++) { var ph2 = PH0 + (PH1 - PH0) * i / 120, v = sds ? -0.9 : q(ph2, p.pI); if (i) mx.lineTo(x(ph2), y(v)); else mx.moveTo(x(ph2), y(v)); }
+    mx.stroke();
+    if (!sds) { mx.setLineDash([3, 3]); mx.strokeStyle = p.c; mx.lineWidth = 1; mx.beginPath(); mx.moveTo(x(p.pI), tp); mx.lineTo(x(p.pI), h - bt); mx.stroke(); mx.setLineDash([]); }
+    M.forEach(function (m) { if (m.p !== track) return; var v = sds ? -0.9 : q(m.x, p.pI); mx.fillStyle = v > 0.05 ? css('--pos') : v < -0.05 ? css('--neg') : css('--zero'); mx.beginPath(); mx.arc(x(m.x), y(v), 3.5, 0, 6.29); mx.fill(); });
+  }
+  // ---- panel ----
+  var stepsEl = document.getElementById('steps'), pickEl = document.getElementById('pick');
+  STAGES.forEach(function () { stepsEl.appendChild(document.createElement('i')); });
+  P.forEach(function (p, i) { var b = document.createElement('button'); b.innerHTML = '<i style="background:' + p.c + '"></i>' + p.id; b.title = String(i + 1); b.onclick = function () { track = i; render(); }; pickEl.appendChild(b); });
+  function panel() {
+    var s = stageAt(t), p = P[track];
+    Array.prototype.forEach.call(stepsEl.children, function (el, i) { el.className = i <= s ? 'on' : ''; });
+    Array.prototype.forEach.call(pickEl.children, function (el, i) { el.setAttribute('aria-pressed', i === track ? 'true' : 'false'); });
+    document.getElementById('stTitle').textContent = STAGES[s].title;
+    document.getElementById('stText').textContent = STAGES[s].text;
+    var mean = M.filter(function (m) { return m.p === track; }).reduce(function (a, m) { return a + m.x; }, 0) / NM, qq = q(mean, p.pI);
+    var state = t >= T_IEF ? 'coated in SDS: negative' : Math.abs(mean - p.pI) < 0.15 ? 'at its pI: net charge about 0' : (qq > 0 ? 'below its pI: net +, pulled toward −' : 'above its pI: net −, pulled toward +');
+    document.getElementById('who').innerHTML = '<b style="color:' + p.c + '">Tracking ' + p.id + '</b> (pI ' + p.pI + ', ' + p.kda + ' kDa): ' + state;
+    var can = t > 0.5 && t < T_IEF; document.getElementById('bKickL').disabled = !can; document.getElementById('bKickR').disabled = !can;
+    document.getElementById('scrub').value = Math.round(1000 * t / T_END);
+    document.getElementById('bPlay').textContent = playing ? 'Pause (Space)' : 'Play (Space)';
+  }
+  function render() { draw(); drawMini(); panel(); }
+
+  // ---- time ----
+  var last = null, RATE = 3;
+  function advance(to) { if (to <= T_IEF) simTo(to); else simTo(T_IEF); t = to; }
+  function tick(now) {
+    if (!playing) { last = null; return; }
+    if (last !== null) {
+      var nt = Math.min(T_END, t + RATE * Math.min(0.1, (now - last) / 1000));
+      if (target !== null && nt >= target) { nt = target; target = null; playing = false; }
+      if (nt >= T_END) playing = false;
+      // inside focusing, keep running past the stage stop only if the user keeps playing
+      if (t < T_IEF) { while (simT < Math.min(nt, T_IEF) - 1e-9) step(); }
+      t = nt;
+    }
+    last = now; render();
+    if (playing) requestAnimationFrame(tick);
+  }
+  function go(to) {
+    kickLeft = 0;
+    if (to < t) { playing = false; target = null; advance(to); render(); return; }
+    if (reduce) { advance(to); playing = false; render(); return; }
+    target = to; if (!playing) { playing = true; requestAnimationFrame(tick); }
+  }
+  function next() { var s = stageAt(t); if (s < STAGES.length - 1) go(STAGES[s + 1].t); }
+  function back() { var s = stageAt(t), i = (t > STAGES[s].t + 0.01) ? s : Math.max(0, s - 1); go(STAGES[i].t); }
+  function play() {
+    kickLeft = 0;
+    if (reduce) { next(); return; }
+    if (playing) { playing = false; target = null; render(); return; }
+    if (t >= T_END) { init(); t = 0; }
+    target = null; playing = true; requestAnimationFrame(tick);
+  }
+  function reset() { kickLeft = 0; playing = false; target = null; init(); t = 0; render(); }
+  document.getElementById('bPlay').onclick = play;
+  document.getElementById('bNext').onclick = next;
+  document.getElementById('bBack').onclick = back;
+  document.getElementById('bReset').onclick = reset;
+  document.getElementById('bKickL').onclick = function () { kick(-1); };
+  document.getElementById('bKickR').onclick = function () { kick(1); };
+  document.getElementById('scrub').oninput = function () { playing = false; target = null; advance(T_END * this.value / 1000); render(); };
+  function press(id, on) { document.getElementById(id).setAttribute('aria-pressed', on ? 'true' : 'false'); }
+  document.getElementById('bArrows').onclick = function () { arrowsAll = !arrowsAll; press('bArrows', arrowsAll); render(); };
+  function light() { var r = document.documentElement; r.dataset.theme = r.dataset.theme === 'light' ? 'dark' : 'light'; render(); }
+  document.getElementById('bLight').onclick = light;
+  function full() { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); }
+  document.getElementById('bFull').onclick = full;
+  document.addEventListener('keydown', function (e) {
+    if (e.target.tagName === 'INPUT') return;
+    var k = e.key;
+    if (k === ' ') { e.preventDefault(); play(); }
+    else if (k === 'ArrowRight') { e.preventDefault(); next(); }
+    else if (k === 'ArrowLeft') { e.preventDefault(); back(); }
+    else if (k === 'r' || k === 'R') reset();
+    else if (k === 'j' || k === 'J') kick(-1);
+    else if (k === 'k' || k === 'K') kick(1);
+    else if (k === 'v' || k === 'V') document.getElementById('bArrows').click();
+    else if (k === 'l' || k === 'L') light();
+    else if (k === 'f' || k === 'F') full();
+    else if (k >= '1' && k <= '6') { track = +k - 1; render(); }
+  });
+  window.addEventListener('resize', render);
+
+  // ---- self-test ----
+  window.TWODTEST = function () {
+    var f = [], keep = {seed: seed, M: JSON.stringify(M), simT: simT};
+    function stats(pi) { var xs = M.filter(function (m) { return m.p === pi; }).map(function (m) { return m.x; }); var mu = xs.reduce(function (a, b) { return a + b; }, 0) / xs.length; return {m: mu, sd: Math.sqrt(xs.reduce(function (a, b) { return a + (b - mu) * (b - mu); }, 0) / xs.length)}; }
+    // (a) every protein focuses at its pI as a thin band
+    init(); simTo(T_IEF);
+    P.forEach(function (p, i) { var s = stats(i); if (Math.abs(s.m - p.pI) > 0.1 || s.sd > 0.2) f.push('(a) ' + p.id + ' at ' + s.m.toFixed(2) + ' sd ' + s.sd.toFixed(2)); });
+    // (b) sign rule: + below the pI moves up the pH (toward -), - above moves down (toward +)
+    P.forEach(function (p) { if (!(q(p.pI - 0.5, p.pI) > 0 && q(p.pI + 0.5, p.pI) < 0 && Math.abs(q(p.pI, p.pI)) < 1e-12)) f.push('(b) sign rule ' + p.id); });
+    // (c) overshoot either way and it comes back within 10 time units
+    [-1, 1].forEach(function (dir) {
+      init(); simTo(T_IEF / 2); M.forEach(function (m) { if (m.p === 3) m.x = P[3].pI + dir * 1.2; });
+      for (var i = 0; i < 10 / DT; i++) step();
+      var s = stats(3); if (Math.abs(s.m - P[3].pI) > 0.1) f.push('(c) kick ' + dir + ' did not return: ' + s.m.toFixed(2));
+    });
+    // (d) second dimension: bigger runs less; same size -> same depth; same pI -> same column
+    var order = P.slice().sort(function (a, b) { return b.kda - a.kda; });
+    for (var i = 1; i < order.length; i++) if (rf(order[i].kda) < rf(order[i - 1].kda)) f.push('(d) size order');
+    if (rf(P[0].kda) !== rf(P[3].kda) || P[0].pI === P[3].pI) f.push('(d) A/D pair');
+    if (P[1].pI !== P[5].pI || Math.abs(rf(P[1].kda) - rf(P[5].kda)) < 0.15) f.push('(d) B/F pair');
+    // (e) molecules stay on the strip
+    init(); simTo(T_IEF); if (M.some(function (m) { return m.x < PH0 || m.x > PH1; })) f.push('(e) off the strip');
+    seed = keep.seed; M = JSON.parse(keep.M); simT = keep.simT;
+    return {fails: f};
+  };
+  // ---- capture mode (?capture=1): a scripted 1920x1080 clip for PowerPoint, drawn by renderAt(seconds) ----
+  // 0-1 s loaded; 1-9 focusing; kick D basic at 10 and acidic at 14 (clock held while it returns); then SDS, transfer, size run.
+  function applyKick(dir) { M.forEach(function (m) { if (m.p === track) m.x = Math.min(PH1 - 0.05, Math.max(PH0 + 0.05, P[m.p].pI + dir * (1.1 + 0.15 * Math.abs(m.jx)))); }); }
+  function recover(sec) { var n = Math.min(10 / DT, Math.round(sec * 3 / DT)); for (var i = 0; i < n; i++) stepNoClock(); }
+  var KICK_NOTE = null;
+  function stateAt(c) {
+    init(); track = 3; KICK_NOTE = null;
+    if (c < 1) { t = 0; return; }
+    if (c < 9) { simTo((c - 1) * 3); t = (c - 1) * 3; return; }
+    simTo(24); t = 24;
+    if (c < 10) return;
+    applyKick(1); recover(Math.min(c, 14) - 10);
+    if (c < 14) { KICK_NOTE = ['Overshoot to the basic side', 'D is pushed past its pI, where it is net −. It is pulled back toward + until its charge is zero again.']; return; }
+    applyKick(-1); recover(Math.min(c, 18) - 14);
+    if (c < 18) { KICK_NOTE = ['Overshoot to the acidic side', 'Now D is below its pI and net +. It is pulled toward −, back up to its pI.']; return; }
+    if (c < 20) { t = 24 + (c - 18) * 6; simTo(t); return; }
+    t = Math.min(T_END, 36 + (c - 20) * 3); simTo(t);
+  }
+  function wrap(g, txt, x, y, w, lh) { var words = txt.split(' '), line = ''; words.forEach(function (wd) { var tst = line ? line + ' ' + wd : wd; if (g.measureText(tst).width > w && line) { g.fillText(line, x, y); y += lh; line = wd; } else line = tst; }); if (line) g.fillText(line, x, y); return y + lh; }
+  if (/[?&]capture=1/.test(location.search)) {
+    var st = document.createElement('style'); st.textContent = 'main{flex:none;height:700px} #stage{flex:none;width:960px}'; document.head.appendChild(st); // bigger text once scaled into the clip
+    var cc = document.createElement('canvas'); cc.width = 1920; cc.height = 1080; cc.style.cssText = 'position:fixed;left:0;top:0;visibility:hidden';
+    document.body.insertBefore(cc, document.body.firstChild);
+    window.CLIP = {len: 37, fps: 24};
+    window.renderAt = function (c) {
+      stateAt(c); playing = false; render();
+      var g = cc.getContext('2d'), S = STAGES[stageAt(t)], hd = KICK_NOTE || [S.title, S.text];
+      g.fillStyle = css('--bg'); g.fillRect(0, 0, 1920, 1080);
+      g.fillStyle = css('--ink'); g.font = '700 50px system-ui,Segoe UI,Arial'; g.textAlign = 'left'; g.fillText('2-D PAGE: focus by pI, then separate by size', 60, 84);
+      var sc = Math.min(1300 / cv.width, 930 / cv.height); g.drawImage(cv, 30, 120, cv.width * sc, cv.height * sc);
+      var x0 = 1390, w = 480;
+      g.fillStyle = css('--panel'); g.fillRect(x0 - 24, 130, w + 48, 900); g.strokeStyle = css('--line'); g.lineWidth = 2; g.strokeRect(x0 - 24, 130, w + 48, 900);
+      g.fillStyle = css('--ink'); g.font = '700 40px system-ui,Segoe UI,Arial'; var y = wrap(g, hd[0], x0, 195, w, 48);
+      g.font = '32px system-ui,Segoe UI,Arial'; y = wrap(g, hd[1], x0, y + 14, w, 42);
+      var who = document.getElementById('who').textContent;
+      g.fillStyle = P[track].c; g.font = '700 30px system-ui,Segoe UI,Arial'; y = wrap(g, who, x0, Math.max(y + 30, 640), w, 38);
+      var ms = w / mc.width; g.drawImage(mc, x0, y + 4, w, mc.height * ms);
+    };
+  }
+  init();
+  var qs = /[?&]t=([\d.]+)/.exec(location.search); if (qs) advance(Math.min(T_END, +qs[1])); // open at a time, for checks
+  render();
+})();
+</script>
+</body>
+</html>

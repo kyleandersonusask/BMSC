@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FRET: overlap and distance (clip)</title>
+<script type="application/json" id="demo-meta">
+{"title": "FRET: spectral overlap, distance, and two uses", "course": "BMSC 240",
+ "idea": "Energy passes from an excited donor to an acceptor without a photon, only if the donor's emission overlaps the acceptor's absorption and the two are within a few nanometres (E = 1 / (1 + (r/R0)^6)).",
+ "misconception": "that the donor emits a photon which the acceptor then absorbs; that FRET works at any distance; that any two coloured dyes will do",
+ "science": "Forster 1948; Lakowicz, Principles of Fluorescence Spectroscopy, 3rd ed., ch. 13: E = 1/(1+(r/R0)^6); R0 depends on the overlap integral J, the donor quantum yield and orientation (kappa^2). CFP-YFP R0 about 4.9 nm (Patterson et al. 2000, Anal Biochem 284:438). Uses: protein-protein interaction (donor and acceptor fused to two partners) and intramolecular biosensors (cameleons, Miyawaki et al. 1997, Nature 388:882).",
+ "stylised": "spectra drawn as smooth bumps (CFP/YFP-like peaks), intensities schematic, orientation factor ignored, time sped up"}
+</script>
+<style>html,body{margin:0;height:100%;background:#fff;display:grid;place-items:center;overflow:hidden}canvas{width:min(100vw,calc(100vh*16/9));height:auto;display:block}</style>
+</head>
+<body>
+<canvas id="cv" width="1920" height="1080" role="img" aria-label="FRET. First, the donor's emission spectrum must overlap the acceptor's absorption spectrum; when the acceptor's spectrum slides away, transfer falls. Second, transfer falls steeply with distance: efficiency equals one over one plus r over R0 to the sixth power. Third, two uses: two tagged proteins bind and the yellow acceptor lights up; a single sensor protein closes around its ligand and FRET rises."></canvas>
+<script>
+(function () {
+  "use strict";
+  var cv = document.getElementById('cv'), g = cv.getContext('2d');
+  var W = 1920, H = 1080, FPS = 24, LEN = 26, HOLD = 25.5;
+  var FONT = 'Calibri, "Segoe UI", Arial, sans-serif';
+  var C = { ink: '#1d2733', soft: '#55606e', axis: '#2b3440', cyan: '#1597c9', cyanGlow: 'rgba(21,151,201,', yel: '#d9a400', yelGlow: 'rgba(242,196,24,', violet: '#6a4fb3', grey: '#c9d1da', prot: '#b7c4d3', protEdge: '#5b6b7d', overlap: 'rgba(120,170,90,0.35)', track: '#e6e9ee', good: '#2f7d32', warn: '#b35a00' };
+  function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+  function ease(f) { f = clamp(f, 0, 1); return f * f * (3 - 2 * f); }
+  function seg(t, a, b) { return clamp((t - a) / (b - a), 0, 1); }
+  function lerp(a, b, f) { return a + (b - a) * f; }
+  function text(s, x, y, size, color, o) { o = o || {}; g.save(); g.globalAlpha *= (o.alpha == null ? 1 : o.alpha); g.font = (o.bold ? '700 ' : o.it ? 'italic 400 ' : '400 ') + size + 'px ' + FONT; g.fillStyle = color; g.textAlign = o.align || 'left'; g.fillText(s, x, y); g.restore(); }
+  var OV = {};   // interactive overrides: accPk, r, bind, close, lig
+  function eff(r, R0) { return 1 / (1 + Math.pow(r / R0, 6)); }
+  var R0 = 4.9;
+  window.FRETTEST = function () { // (a) E = 0.5 at R0; (b) E falls as r grows; (c) E(2 R0) = 1/65; (d) E near 1 at 0.5 R0
+    var f = [];
+    if (Math.abs(eff(R0, R0) - 0.5) > 1e-12) f.push('(a) E(R0)');
+    for (var r = 0.5; r < 15; r += 0.1) if (eff(r + 0.1, R0) >= eff(r, R0)) f.push('(b) not falling at ' + r.toFixed(1));
+    if (Math.abs(eff(2 * R0, R0) - 1 / 65) > 1e-12) f.push('(c) E(2R0)');
+    if (eff(0.5 * R0, R0) < 0.98) f.push('(d) E(R0/2)');
+    return {fails: f};
+  };
+  if (/[?&]test=1/.test(location.search)) (function () { var pre = document.createElement('pre'); pre.id = 'testout'; pre.textContent = JSON.stringify(window.FRETTEST()); document.body.appendChild(pre); })();
+
+  // ---------- shared pieces ----------
+  function glow(x, y, r, rgba, a) { if (a <= 0.01) return; var gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, rgba + (0.85 * a) + ')'); gr.addColorStop(1, rgba + '0)'); g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, 6.283); g.fill(); }
+  function fluor(x, y, col, label, excited) {  // a fluorophore: barrel with chromophore
+    g.save(); g.beginPath(); g.ellipse(x, y, 34, 44, 0, 0, 6.283); g.fillStyle = '#ffffff'; g.fill(); g.lineWidth = 5; g.strokeStyle = col; g.stroke();
+    g.beginPath(); g.arc(x, y, 12, 0, 6.283); g.fillStyle = col; g.fill(); g.restore();
+    if (label) text(label, x, y + 80, 28, C.ink, { align: 'center', bold: true });
+  }
+  function photon(x0, y0, x1, y1, f, col, label) {   // a wavy light arrow, drawn to fraction f
+    if (f <= 0) return; g.save(); g.strokeStyle = col; g.lineWidth = 5; g.beginPath();
+    var n = 60, dx = x1 - x0, dy = y1 - y0, L = Math.hypot(dx, dy), ux = dx / L, uy = dy / L;
+    for (var i = 0; i <= n * f; i++) { var s = i / n, w = 9 * Math.sin(s * L / 14); var x = x0 + dx * s - uy * w, y = y0 + dy * s + ux * w; if (i) g.lineTo(x, y); else g.moveTo(x, y); }
+    g.stroke(); g.restore(); if (label && f > 0.6) text(label, (x0 + x1) / 2 + 14, (y0 + y1) / 2 - 18, 24, col, { bold: true });
+  }
+  function transfer(x0, x1, y, a) {   // non-radiative transfer: dashed arrow, no wave
+    if (a <= 0.02) return; g.save(); g.globalAlpha = a; g.setLineDash([12, 9]); g.strokeStyle = C.good; g.lineWidth = 5;
+    g.beginPath(); g.moveTo(x0, y); g.lineTo(x1 - 14, y); g.stroke(); g.setLineDash([]);
+    g.fillStyle = C.good; g.beginPath(); g.moveTo(x1, y); g.lineTo(x1 - 22, y - 12); g.lineTo(x1 - 22, y + 12); g.closePath(); g.fill(); g.restore();
+  }
+  function bars(x, y, cyanI, yelI, a) {   // emission readout
+    g.save(); g.globalAlpha = a;
+    text('light out', x, y - 16, 26, C.soft);
+    [[cyanI, C.cyan, 'cyan'], [yelI, C.yel, 'yellow']].forEach(function (b, i) {
+      var yy = y + i * 54; g.fillStyle = C.track; g.beginPath(); g.roundRect(x, yy, 300, 34, 10); g.fill();
+      g.fillStyle = b[1]; g.beginPath(); g.roundRect(x, yy, Math.max(16, 300 * b[0]), 34, 10); g.fill();
+      text(b[2], x + 316, yy + 27, 26, C.ink);
+    });
+    g.restore();
+  }
+
+  // ---------- part 1: spectral overlap (0-8.5 s) ----------
+  function bump(nm, peak, w) { return Math.exp(-Math.pow((nm - peak) / w, 2)); }
+  function part1(t, a) {
+    if (a <= 0) return;
+    g.save(); g.globalAlpha = a;
+    var X0 = 170, Y0 = 760, PW = 1100, PH = 460, nm0 = 400, nm1 = 700;
+    function px(nm) { return X0 + (nm - nm0) / (nm1 - nm0) * PW; } function py(v) { return Y0 - v * PH; }
+    // the acceptor's absorption peak: matched (514), slides away (640), comes back
+    var shift = ease(seg(t, 2.8, 4.6)) * (1 - ease(seg(t, 5.8, 7.4)));
+    var accPk = OV.accPk != null ? OV.accPk : lerp(514, 640, shift);
+    g.strokeStyle = C.axis; g.lineWidth = 4; g.beginPath(); g.moveTo(X0, Y0 - PH - 20); g.lineTo(X0, Y0); g.lineTo(X0 + PW + 20, Y0); g.stroke();
+    for (var k = 400; k <= 700; k += 50) text(String(k), px(k), Y0 + 36, 24, C.soft, { align: 'center' });
+    text('wavelength (nm)', X0 + PW / 2, Y0 + 76, 28, C.ink, { align: 'center', bold: true });
+    // overlap fill
+    g.fillStyle = C.overlap; g.beginPath(); g.moveTo(px(nm0), Y0);
+    for (var nm = nm0; nm <= nm1; nm += 2) g.lineTo(px(nm), py(Math.min(bump(nm, 476, 30), bump(nm, accPk, 28))));
+    g.lineTo(px(nm1), Y0); g.closePath(); g.fill();
+    function curve(f, col, dash) { g.save(); g.strokeStyle = col; g.lineWidth = 6; if (dash) g.setLineDash(dash); g.beginPath(); for (var nm = nm0; nm <= nm1; nm += 2) { var y = py(f(nm)); if (nm === nm0) g.moveTo(px(nm), y); else g.lineTo(px(nm), y); } g.stroke(); g.restore(); }
+    // the other two curves, lighter: donor absorption (where it is excited) and acceptor emission (what it gives out)
+    g.save(); g.globalAlpha *= 0.45;
+    curve(function (nm) { return bump(nm, 433, 26); }, C.cyan, [16, 10]);
+    curve(function (nm) { return bump(nm, accPk + 13, 30); }, C.yel);
+    g.restore();
+    text('donor absorption', px(433) - 10, py(1.04) + 44, 24, C.cyan, { align: 'center', alpha: 0.75 });
+    text('acceptor emission', px(accPk + 13) + 60, py(1.04) + 92, 24, C.yel, { align: 'center', alpha: 0.85 });
+    text('solid = emission  ·  dashed = absorption', X0 + PW, Y0 + 118, 24, C.soft, { align: 'right' });
+    curve(function (nm) { return bump(nm, 476, 30); }, C.cyan);
+    curve(function (nm) { return bump(nm, accPk, 28); }, C.yel, [16, 10]);
+    text('donor emission', px(476) - 20, py(1.04), 28, C.cyan, { align: 'center', bold: true });
+    text('acceptor absorption', px(accPk) + 40, py(1.04) + 44, 28, C.yel, { align: 'center', bold: true });
+    // overlap integral and efficiency gauge
+    var ov = 0, tot = 0; for (var nm2 = nm0; nm2 <= nm1; nm2 += 2) { ov += Math.min(bump(nm2, 476, 30), bump(nm2, accPk, 28)); tot += Math.min(bump(nm2, 476, 30), bump(nm2, 514, 28)); }
+    var J = ov / tot, Rj = 4.9 * Math.pow(Math.max(J, 1e-6), 1 / 6), E = eff(4.9, Rj);
+    text('overlap', 1400, 330, 30, C.ink, { bold: true });
+    g.fillStyle = C.track; g.beginPath(); g.roundRect(1400, 350, 360, 34, 12); g.fill(); g.fillStyle = '#7aa85a'; g.beginPath(); g.roundRect(1400, 350, Math.max(18, 360 * J), 34, 12); g.fill();
+    text(Math.round(J * 100) + ' %', 1780, 377, 30, C.ink, { bold: true });
+    text('FRET at a fixed 4.9 nm', 1400, 450, 30, C.ink, { bold: true });
+    g.fillStyle = C.track; g.beginPath(); g.roundRect(1400, 470, 360, 34, 12); g.fill(); g.fillStyle = C.good; g.beginPath(); g.roundRect(1400, 470, Math.max(18, 360 * E), 34, 12); g.fill();
+    text(Math.round(E * 100) + ' %', 1780, 497, 30, C.ink, { bold: true });
+    text('(R0 shrinks as overlap falls)', 1400, 546, 24, C.soft);
+    var cap = J < 0.3 ? ['No overlap, no transfer.', C.warn] : ['The donor’s emission must overlap the acceptor’s absorption.', C.ink];
+    text(cap[0], W / 2, 1000, 36, cap[1], { align: 'center', bold: true });
+    g.restore();
+  }
+
+  // ---------- part 2: distance (8.5-16.5 s) ----------
+  function part2(t, a) {
+    if (a <= 0) return;
+    g.save(); g.globalAlpha = a;
+    var u = seg(t, 9.6, 15.0), r = 2 + 8 * (0.5 - 0.5 * Math.cos(u * Math.PI * 2 * 0.75)); // 2 -> 10 -> back toward ~4.9 nm
+    if (t > 15) r = lerp(2 + 8 * (0.5 - 0.5 * Math.cos(Math.PI * 1.5)), 4.9, ease(seg(t, 15, 15.8)));
+    if (OV.r != null) r = OV.r;
+    var E = eff(r, R0), dx = 260, cx = 520, y = 420, s = 44;   // 44 px per nm
+    var xD = cx - r * s / 2 - 100, xA = cx + r * s / 2 + 100;
+    xD = Math.max(160, xD); xA = Math.min(1060, xA);
+    var xd = cx - r * s / 2, xa = cx + r * s / 2;
+    // excitation light into the donor
+    var pul = (t * 1.2) % 1;
+    photon(xd - 260, y - 200, xd - 30, y - 30, 1, C.violet, '433 nm in');
+    glow(xd, y, 90, C.cyanGlow, (1 - E) * (0.7 + 0.3 * Math.sin(t * 6)));
+    glow(xa, y, 90, C.yelGlow, E * (0.7 + 0.3 * Math.sin(t * 6)));
+    fluor(xd, y, C.cyan, 'donor', true); fluor(xa, y, C.yel, 'acceptor');
+    transfer(xd + 40, xa - 40, y - 70, E);
+    if (E > 0.15) text('no photon passes', (xd + xa) / 2, y - 92, 22, C.good, { align: 'center', alpha: clamp((E - 0.15) * 3, 0, 1) });
+    photon(xd + 10, y + 50, xd + 120, y + 210, 1 - E, C.cyan, '');
+    photon(xa + 10, y + 50, xa + 120, y + 210, E, C.yel, '');
+    // ruler
+    g.strokeStyle = C.axis; g.lineWidth = 3; g.beginPath(); g.moveTo(xd, y + 130); g.lineTo(xa, y + 130); g.stroke();
+    text('r = ' + r.toFixed(1) + ' nm', (xd + xa) / 2, y + 170, 30, C.ink, { align: 'center', bold: true });
+    // E vs r curve
+    var X0 = 1180, Y0 = 760, PW = 620, PH = 440;
+    function px(rr) { return X0 + rr / 10 * PW; } function py(e) { return Y0 - e * PH; }
+    g.strokeStyle = C.axis; g.lineWidth = 4; g.beginPath(); g.moveTo(X0, Y0 - PH - 20); g.lineTo(X0, Y0); g.lineTo(X0 + PW + 20, Y0); g.stroke();
+    for (var k = 0; k <= 10; k += 2) text(String(k), px(k), Y0 + 34, 24, C.soft, { align: 'center' });
+    text('distance r (nm)', X0 + PW / 2, Y0 + 72, 28, C.ink, { align: 'center', bold: true });
+    text('FRET efficiency', X0 - 10, Y0 - PH - 34, 28, C.ink, { bold: true });
+    g.strokeStyle = C.good; g.lineWidth = 6; g.beginPath(); for (var rr = 0.5; rr <= 10; rr += 0.05) { if (rr === 0.5) g.moveTo(px(rr), py(eff(rr, R0))); else g.lineTo(px(rr), py(eff(rr, R0))); } g.stroke();
+    g.setLineDash([8, 8]); g.strokeStyle = C.soft; g.lineWidth = 2; g.beginPath(); g.moveTo(px(R0), Y0); g.lineTo(px(R0), py(0.5)); g.lineTo(X0, py(0.5)); g.stroke(); g.setLineDash([]);
+    text('R0 ≈ 4.9 nm: half', px(R0) + 12, py(0.5) - 12, 24, C.soft);
+    g.beginPath(); g.arc(px(r), py(E), 13, 0, 6.283); g.fillStyle = C.good; g.fill(); g.lineWidth = 3; g.strokeStyle = '#fff'; g.stroke();
+    text('E = 1 / (1 + (r/R0)⁶)', X0 + PW - 10, Y0 - PH + 10, 30, C.ink, { align: 'right', bold: true });
+    text('E = ' + Math.round(E * 100) + ' %', X0 + PW - 10, Y0 - PH + 52, 30, C.good, { align: 'right', bold: true });
+    bars(200, 820, (1 - E) * 0.9 + 0.05, E * 0.9 + 0.05, 1);
+    text('Only within a few nanometres, and it falls off as the sixth power.', W / 2, 1010, 36, C.ink, { align: 'center', bold: true });
+    g.restore();
+  }
+
+  // ---------- part 3: two uses (16.5-26 s) ----------
+  function protein(x, y, w, h, label) { g.beginPath(); g.ellipse(x, y, w, h, 0, 0, 6.283); g.fillStyle = C.prot; g.fill(); g.lineWidth = 4; g.strokeStyle = C.protEdge; g.stroke(); text(label, x, y + 10, 28, C.ink, { align: 'center', bold: true }); }
+  // an antibody (Y shape): Fab arm tips on the protein at (x, y), pointing out along angle dir; returns where its dye sits
+  function antibody(x, y, dir, col) {
+    var ux = Math.cos(dir), uy = Math.sin(dir), jx = x + ux * 46, jy = y + uy * 46, ex = jx + ux * 62, ey = jy + uy * 62;
+    g.save(); g.lineCap = 'round'; g.strokeStyle = '#7d6a9e'; g.lineWidth = 16;
+    [-0.55, 0.55].forEach(function (sp) { var ax = Math.cos(dir + Math.PI + sp), ay = Math.sin(dir + Math.PI + sp); g.beginPath(); g.moveTo(jx, jy); g.lineTo(jx + ax * 50, jy + ay * 50); g.stroke(); });
+    g.beginPath(); g.moveTo(jx, jy); g.lineTo(ex, ey); g.stroke(); g.restore();
+    return { x: ex + ux * 18, y: ey + uy * 18 };
+  }
+  function dye(p, col) { g.beginPath(); g.arc(p.x, p.y, 17, 0, 6.283); g.fillStyle = col; g.fill(); g.lineWidth = 4; g.strokeStyle = '#ffffff'; g.stroke(); }
+  function part3(t, a) {
+    if (a <= 0) return;
+    g.save(); g.globalAlpha = a;
+    // left: two proteins meet
+    var bind = OV.bind != null ? OV.bind : ease(seg(t, 18.0, 20.2)), Pd = lerp(560, 0, bind);
+    var lx = 470, ly = 560, xX = lx - 130 - Pd / 2, xY = lx + 130 + Pd / 2;
+    text('Do two proteins meet?', lx, 260, 32, C.ink, { align: 'center', bold: true });
+    protein(xX, ly, 110, 80, 'X'); protein(xY, ly, 110, 80, 'Y');
+    var dD = antibody(xX + 80, ly - 66, -Math.PI / 2 + 0.25), aA = antibody(xY - 80, ly - 66, -Math.PI / 2 - 0.25);
+    var rL = 2 + (Math.hypot(aA.x - dD.x, 0) / 56);   // about 56 px per nm here
+    var EL = eff(rL, R0);
+    photon(dD.x - 150, dD.y - 150, dD.x - 24, dD.y - 26, 1, C.violet, '');
+    glow(dD.x, dD.y, 70, C.cyanGlow, 1 - EL); glow(aA.x, aA.y, 70, C.yelGlow, EL);
+    dye(dD, C.cyan); dye(aA, C.yel);
+    transfer(dD.x + 24, aA.x - 24, dD.y - 40, EL);
+    text('antibody + donor dye', dD.x, dD.y - 40, 24, C.cyan, { align: 'center', bold: true, alpha: 1 - bind });
+    text('antibody + acceptor dye', aA.x, aA.y - 40, 24, C.yel, { align: 'center', bold: true, alpha: 1 - bind });
+    bars(lx - 190, 790, (1 - EL) * 0.9 + 0.05, EL * 0.9 + 0.05, 1);
+    text(bind > 0.9 ? 'bound: yellow appears' : 'apart: only cyan', lx, 940, 30, bind > 0.9 ? C.good : C.soft, { align: 'center', bold: true });
+    // right: one protein changes shape
+    var close = OV.close != null ? OV.close : ease(seg(t, 20.8, 23.0)), rx = 1440, ry = 650;
+    text('Does one protein change shape?', rx, 260, 32, C.ink, { align: 'center', bold: true });
+    var open = lerp(1, 0, close), ang = lerp(0.9, 0.18, close);
+    g.save(); g.translate(rx, ry + 60);
+    [-1, 1].forEach(function (sd) {   // two lobes on a hinge
+      g.save(); g.rotate(sd * ang); g.beginPath(); g.ellipse(sd * 0, -120, 66, 120, 0, 0, 6.283); g.fillStyle = C.prot; g.fill(); g.lineWidth = 4; g.strokeStyle = C.protEdge; g.stroke(); g.restore();
+    });
+    g.restore();
+    var tipL = { x: rx + Math.sin(-ang) * 240 * -1 * -1, y: 0 }, a1 = -ang, a2 = ang;
+    var dP = antibody(rx + Math.sin(a1) * 232, ry + 60 - Math.cos(a1) * 232, a1 - Math.PI / 2 + 0.35), aP = antibody(rx + Math.sin(a2) * 232, ry + 60 - Math.cos(a2) * 232, a2 - Math.PI / 2 - 0.35);
+    var rR = 1.6 + Math.hypot(aP.x - dP.x, aP.y - dP.y) / 56, ER = eff(rR, R0);
+    // ligand drifts in and sits in the cleft
+    var lig = OV.lig != null ? OV.lig : ease(seg(t, 19.6, 20.8)); g.beginPath(); g.arc(lerp(rx + 260, rx, lig), lerp(ry - 240, ry - 40, lig), 22, 0, 6.283); g.fillStyle = C.violet; g.fill();
+    text('ligand', lerp(rx + 260, rx, lig) + 34, lerp(ry - 240, ry - 40, lig) + 8, 24, C.violet, { bold: true, alpha: 1 - close });
+    glow(dP.x, dP.y, 70, C.cyanGlow, 1 - ER); glow(aP.x, aP.y, 70, C.yelGlow, ER);
+    dye(dP, C.cyan); dye(aP, C.yel);
+    transfer(dP.x + 24, aP.x - 24, Math.min(dP.y, aP.y) - 40, ER);
+    bars(rx - 190, 790, (1 - ER) * 0.9 + 0.05, ER * 0.9 + 0.05, 1);
+    text(close > 0.9 ? 'closed: FRET rises' : 'open: low FRET', rx, 940, 30, close > 0.9 ? C.good : C.soft, { align: 'center', bold: true });
+    g.strokeStyle = C.grey; g.lineWidth = 3; g.beginPath(); g.moveTo(W / 2, 240); g.lineTo(W / 2, 960); g.stroke();
+    text('FRET reports contact: the yellow-to-cyan ratio rises when donor and acceptor come close.', W / 2, 1012, 34, C.ink, { align: 'center', bold: true });
+    g.restore();
+  }
+
+  function renderAt(tIn) {
+    var t = Math.min(tIn, HOLD);
+    g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1; g.fillStyle = '#ffffff'; g.fillRect(0, 0, W, H);
+    part1(t, 1 - seg(t, 8.0, 8.6));
+    part2(t, seg(t, 8.4, 9.0) * (1 - seg(t, 16.0, 16.6)));
+    part3(t, seg(t, 16.4, 17.0));
+    text('stylised: CFP/YFP-like spectra (donor 433 in, 476 out; acceptor 514 in, 527 out); orientation ignored; antibodies drawn small (IgG ~10 nm; Fab or nanobody keeps dyes closer)', 1890, 1066, 22, C.soft, { align: 'right' });
+  }
+  window.renderAt = renderAt; window.CLIP = { len: LEN, fps: FPS };
+  var q = new URLSearchParams(location.search), st = q.get('t');
+  if (q.get('capture') === '1') { renderAt(0); return; }
+  if (st !== null) { renderAt(parseFloat(st) || 0); return; }
+  if (q.get('loop') === '1') {                      // plain loop, like the video
+    var t0 = performance.now(), lastF = -1;
+    (function loop(now) { var f = Math.floor(((now - t0) / 1000 % LEN) * FPS); if (f !== lastF) { lastF = f; renderAt(f / FPS); } requestAnimationFrame(loop); })(t0);
+    return;
+  }
+  if (q.get('step') !== '1') { interactive(); return; }
+  // step mode (?step=1): each click (or Space / Right) plays to the next stop and waits; Left = back; R = restart; F = full screen
+  var STOPS = [0, 4.6, 8.0, 15.8, 20.3, 23.2, HOLD];
+  var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var s = { t: 0, target: 0, last: 0 };
+  function next() {
+    if (s.t < s.target - 1e-3) { s.t = s.target; return; }          // a press mid-step finishes that step
+    if (s.t >= HOLD - 1e-3) { s.t = 0; s.target = 0; return; }       // after the end, start again
+    for (var i = 0; i < STOPS.length; i++) if (STOPS[i] > s.t + 1e-3) { s.target = STOPS[i]; break; }
+    if (reduce) s.t = s.target;
+  }
+  function back() { var j = STOPS.length - 1; while (j > 0 && STOPS[j] >= s.t - 1e-3) j--; s.t = STOPS[j]; s.target = s.t; }
+  cv.addEventListener('pointerdown', next);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === ' ' || e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === 'Enter') { e.preventDefault(); next(); }
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); back(); }
+    else if (e.key === 'r' || e.key === 'R') { s.t = 0; s.target = 0; }
+    else if (e.key === 'f' || e.key === 'F') { if (document.fullscreenElement) document.exitFullscreen(); else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen(); }
+  });
+  (function step(now) {
+    var dt = s.last ? Math.min(0.05, (now - s.last) / 1000) : 0; s.last = now;
+    if (s.t < s.target) s.t = Math.min(s.target, s.t + dt);
+    renderAt(s.t);
+    var k = 0; while (k < STOPS.length && STOPS[k] <= s.t + 1e-3) k++;
+    text('step ' + Math.max(1, k) + ' of ' + STOPS.length + '  ·  click or Space: next  ·  ← back  ·  R restart  ·  F full screen', 30, 40, 22, C.soft, { alpha: s.t < s.target ? 0.35 : 0.8 });
+    requestAnimationFrame(step);
+  })(performance.now());
+  // ---------- interactive mode (default): three tabs along the top, each one hands-on ----------
+  function interactive() {
+    var TABS = [['1  Overlap', 'drag the yellow curve left or right'], ['2  Distance', 'drag the acceptor, or along the curve'], ['3  Uses', 'drag protein Y; click the right side to add or remove the ligand']];
+    var st = { tab: 0, accPk: 514, r: 3, bind: 0, ligOn: 0, close: 0, lig: 0, drag: null, last: 0 };
+    var tgt = { accPk: 514, r: 3, bind: 0 };
+    function tabRect(i) { return { x: 560 + i * 280, y: 14, w: 260, h: 54 }; }
+    function hit(rc, p) { return p.x >= rc.x && p.x <= rc.x + rc.w && p.y >= rc.y && p.y <= rc.y + rc.h; }
+    function toCanvas(e) { var b = cv.getBoundingClientRect(); return { x: (e.clientX - b.left) * W / b.width, y: (e.clientY - b.top) * H / b.height }; }
+    function apply(p) {
+      if (st.tab === 0) tgt.accPk = clamp(400 + (p.x - 170) / 1100 * 300, 470, 690);
+      else if (st.tab === 1) { if (p.x > 1150) tgt.r = clamp((p.x - 1180) / 620 * 10, 1, 10); else tgt.r = clamp(2 * Math.abs(p.x - 520) / 44, 1, 10); }
+      else if (st.tab === 2 && p.x < W / 2) tgt.bind = 1 - clamp(2 * (p.x - 470 - 130) / 560, 0, 1);
+    }
+    cv.addEventListener('pointerdown', function (e) {
+      var p = toCanvas(e);
+      for (var i = 0; i < 3; i++) if (hit(tabRect(i), p)) { st.tab = i; return; }
+      if (st.tab === 2 && p.x > W / 2) { st.ligOn = st.ligOn ? 0 : 1; return; }
+      st.drag = true; cv.setPointerCapture(e.pointerId); apply(p);
+    });
+    cv.addEventListener('pointermove', function (e) { if (st.drag) apply(toCanvas(e)); });
+    cv.addEventListener('pointerup', function () { st.drag = false; });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === '1' || e.key === '2' || e.key === '3') st.tab = +e.key - 1;
+      else if (e.key === 'ArrowRight') st.tab = Math.min(2, st.tab + 1);
+      else if (e.key === 'ArrowLeft') st.tab = Math.max(0, st.tab - 1);
+      else if (e.key === 'f' || e.key === 'F') { if (document.fullscreenElement) document.exitFullscreen(); else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen(); }
+    });
+    (function frame(now) {
+      var dt = st.last ? Math.min(0.05, (now - st.last) / 1000) : 0; st.last = now;
+      var k = 1 - Math.exp(-dt * 10);                       // values glide toward where you put them
+      st.accPk += (tgt.accPk - st.accPk) * k; st.r += (tgt.r - st.r) * k; st.bind += (tgt.bind - st.bind) * k;
+      st.lig += (st.ligOn - st.lig) * k * 0.6; st.close += ((st.lig > 0.85 ? 1 : 0) - st.close) * k * 0.5;
+      OV = { accPk: st.accPk, r: st.r, bind: st.bind, lig: st.lig, close: st.close };
+      var t = now / 1000;                                   // only the gentle glow pulse uses the clock
+      g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1; g.fillStyle = '#ffffff'; g.fillRect(0, 0, W, H);
+      if (st.tab === 0) part1(t, 1); else if (st.tab === 1) part2(t, 1); else part3(t, 1);
+      g.fillStyle = '#ffffff'; g.fillRect(0, 0, W, 84);
+      for (var i = 0; i < 3; i++) {
+        var rc = tabRect(i), on = i === st.tab;
+        g.beginPath(); g.roundRect(rc.x, rc.y, rc.w, rc.h, 27); g.fillStyle = on ? C.ink : '#eef1f5'; g.fill();
+        text(TABS[i][0], rc.x + rc.w / 2, rc.y + 37, 28, on ? '#ffffff' : C.ink, { align: 'center', bold: true });
+      }
+      text(TABS[st.tab][1], W / 2, 108, 24, C.soft, { align: 'center' });
+      text('stylised: CFP/YFP-like spectra (donor 433 in, 476 out; acceptor 514 in, 527 out); orientation ignored; antibodies drawn small (IgG ~10 nm; Fab or nanobody keeps dyes closer)', 1890, 1066, 22, C.soft, { align: 'right' });
+      requestAnimationFrame(frame);
+    })(performance.now());
+  }
+})();
+</script>
+</body>
+</html>

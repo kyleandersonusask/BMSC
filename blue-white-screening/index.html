@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blue-white screening: alpha complementation</title>
+<style>
+:root{--bg:#f7f8fa;--ink:#16202c;--muted:#4a5a6c;--line:#c4ccd6;--panel:#ffffff;--alpha:#0e9a93;--omega:#8a96a6;--ins:#e0701c;--amp:#6f7b89;--indigo:#2446b8;--agar:#f1e7c9;--bad:#c0392b}
+[data-theme=dark]{--bg:#0f141b;--ink:#e8edf3;--muted:#9fb0c3;--line:#2c3746;--panel:#161d27;--alpha:#2cc7bf;--omega:#7f8c9c;--ins:#f08a3c;--amp:#8d99a8;--indigo:#5b7cff;--agar:#3a3526;--bad:#ff6b6b}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;display:flex;flex-direction:column}
+.bar{display:flex;gap:10px;padding:8px 16px 0;justify-content:flex-end}
+button{font:inherit;font-size:15px;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:3px 10px;cursor:pointer}
+svg{flex:1;min-height:0;width:100%;display:block}
+svg text{fill:var(--ink);font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif}
+.h1{font-size:40px;font-weight:700}
+.h2{font-size:28px;font-weight:700}
+.t{font-size:21px}
+.s{font-size:18px;fill:var(--muted)}
+.b{font-weight:700}
+.panel{fill:var(--panel);stroke:var(--line);stroke-width:2}
+.arr{stroke:var(--muted);stroke-width:3;fill:none;marker-end:url(#ah)}
+</style>
+<script type="application/json" id="demo-meta">{"title":"Blue-white screening: alpha complementation","course":"BMSC (cloning and plasmid isolation)","summary":"How a lacZ-alpha plasmid and a lacZ-delta-M15 host rebuild beta-galactosidase, why X-gal turns the colony blue, why an insert in the MCS gives a white colony to pick for plasmid isolation, and why the alpha piece can be so small."}</script>
+</head>
+<body>
+<div class="bar"><button id="bL" title="L">Dark / light (L)</button><button id="bF" title="F">Full screen (F)</button></div>
+<svg viewBox="0 0 1600 966" role="img" aria-label="Blue-white screening by alpha complementation">
+<defs>
+  <marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--muted)"/></marker>
+  <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="var(--bad)" stroke-width="2"/></pattern>
+</defs>
+
+<text class="h1" x="40" y="52">Blue-white screening: two halves of one enzyme</text>
+
+<!-- ===== sizes ===== -->
+<g id="sizes">
+  <text class="t b" x="330" y="108" text-anchor="end">&#946;-galactosidase (lacZ)</text>
+  <rect x="345" y="88" width="1200" height="26" rx="5" fill="var(--omega)" opacity=".45"/>
+  <text class="s" x="1545" y="80" text-anchor="end">1,024 amino acids per subunit; active only as a tetramer</text>
+  <text class="s" x="345" y="80">aa 1</text>
+
+  <text class="t b" x="330" y="152" text-anchor="end" style="fill:var(--alpha)">&#945; (lacZ&#945;, on the plasmid)</text>
+  <rect x="345" y="132" width="150" height="26" rx="5" fill="var(--alpha)"/>
+  <rect x="354" y="132" width="20" height="26" fill="var(--ins)" opacity=".85"/>
+  <text class="s" x="364" y="176" text-anchor="middle">MCS</text>
+  <text class="t" x="510" y="152">a short N-terminal piece, including residues 11&#8211;41</text>
+
+  <text class="t b" x="330" y="200" text-anchor="end">&#969; (lacZ&#916;M15, in the host)</text>
+  <rect x="345" y="180" width="13" height="26" rx="3" fill="var(--omega)"/>
+  <rect x="358" y="180" width="36" height="26" fill="url(#hatch)" stroke="var(--bad)" stroke-width="1.5"/>
+  <rect x="394" y="180" width="1151" height="26" rx="5" fill="var(--omega)"/>
+  <path d="M376,212 L376,226" stroke="var(--bad)" stroke-width="2"/>
+  <text class="t" x="384" y="236" style="fill:var(--bad)">residues 11&#8211;41 deleted: subunits cannot pair into a tetramer, so &#969; alone is inactive</text>
+</g>
+
+<!-- ===== two columns ===== -->
+<rect class="panel" x="30" y="258" width="755" height="556" rx="14"/>
+<rect class="panel" x="815" y="258" width="755" height="556" rx="14"/>
+<text class="h2" x="54" y="298">Empty vector: <tspan style="fill:var(--indigo)">blue colony</tspan></text>
+<text class="h2" x="839" y="298">Insert in the MCS: white colony</text>
+
+<g transform="translate(0,32)">
+<!-- plasmid, left -->
+<g transform="translate(140,385)">
+  <circle r="58" fill="none" stroke="var(--amp)" stroke-width="10"/>
+  <path d="M-49,-31 A58,58 0 0 1 49,-31" fill="none" stroke="var(--alpha)" stroke-width="12"/>
+  <rect x="-5" y="-66" width="10" height="16" fill="var(--ins)"/>
+  <text class="s" x="0" y="-74" text-anchor="middle">MCS</text>
+  <text class="s" x="0" y="6" text-anchor="middle">ampR, ori</text>
+</g>
+<text class="t" x="225" y="362"><tspan class="b" style="fill:var(--alpha)">lacZ&#945; intact</tspan>, so the</text>
+<text class="t" x="225" y="388">cell makes the &#945; peptide</text>
+
+<!-- plasmid, right -->
+<g transform="translate(925,385)">
+  <circle r="58" fill="none" stroke="var(--amp)" stroke-width="10"/>
+  <path d="M-49,-31 A58,58 0 0 1 -14,-56" fill="none" stroke="var(--alpha)" stroke-width="12"/>
+  <path d="M14,-56 A58,58 0 0 1 49,-31" fill="none" stroke="var(--alpha)" stroke-width="12"/>
+  <path d="M-14,-56 C-36,-100 36,-100 14,-56" fill="none" stroke="var(--ins)" stroke-width="12"/>
+  <text class="s" x="34" y="-80" style="fill:var(--ins)">insert</text>
+  <text class="s" x="0" y="6" text-anchor="middle">ampR, ori</text>
+</g>
+<text class="t" x="1010" y="362"><tspan class="b" style="fill:var(--ins)">Insert splits lacZ&#945;</tspan>: the frame breaks</text>
+<text class="t" x="1010" y="388">or hits a stop, so no working &#945; is made</text>
+
+<!-- assembly, left -->
+<path class="arr" d="M140,452 L140,478"/>
+<g transform="translate(140,530)">
+  <ellipse rx="44" ry="30" fill="var(--omega)"/><text class="s" x="0" y="6" text-anchor="middle" style="fill:#fff">&#969;</text>
+</g>
+<text class="h2" x="196" y="540">+</text>
+<g transform="translate(240,530)"><rect x="-16" y="-9" width="32" height="18" rx="9" fill="var(--alpha)"/><text class="s" x="0" y="-16" text-anchor="middle" style="fill:var(--alpha)">&#945;</text></g>
+<path class="arr" d="M275,530 L315,530"/>
+<g transform="translate(380,530)">
+  <g id="tet">
+    <ellipse cx="-28" cy="-20" rx="26" ry="18" fill="var(--omega)"/><ellipse cx="28" cy="-20" rx="26" ry="18" fill="var(--omega)"/>
+    <ellipse cx="-28" cy="20" rx="26" ry="18" fill="var(--omega)"/><ellipse cx="28" cy="20" rx="26" ry="18" fill="var(--omega)"/>
+  </g>
+  <rect x="-14" y="-26" width="12" height="8" rx="4" fill="var(--alpha)"/><rect x="2" y="-26" width="12" height="8" rx="4" fill="var(--alpha)"/>
+  <rect x="-14" y="18" width="12" height="8" rx="4" fill="var(--alpha)"/><rect x="2" y="18" width="12" height="8" rx="4" fill="var(--alpha)"/>
+</g>
+<text class="t b" x="450" y="522">active tetramer</text>
+<text class="s" x="450" y="548">&#945; fills the gap in each &#969;</text>
+
+<!-- assembly, right -->
+<path class="arr" d="M925,452 L925,478"/>
+<g transform="translate(925,530)"><ellipse rx="44" ry="30" fill="var(--omega)"/><text class="s" x="0" y="6" text-anchor="middle" style="fill:#fff">&#969;</text></g>
+<text class="h2" x="981" y="540">+</text>
+<g transform="translate(1025,530)"><rect x="-16" y="-9" width="32" height="18" rx="9" fill="none" stroke="var(--alpha)" stroke-width="2" stroke-dasharray="4 3"/><path d="M-12,-12 L12,12 M12,-12 L-12,12" stroke="var(--bad)" stroke-width="3"/></g>
+<path class="arr" d="M1060,530 L1100,530"/>
+<g transform="translate(1160,530)">
+  <ellipse cx="-24" cy="0" rx="26" ry="18" fill="var(--omega)"/><ellipse cx="24" cy="0" rx="26" ry="18" fill="var(--omega)"/>
+</g>
+<text class="t b" x="1225" y="522">no tetramer: inactive</text>
+<text class="s" x="1225" y="548">&#969; alone cannot finish the enzyme</text>
+
+<!-- X-gal, left -->
+<path class="arr" d="M140,568 L140,594"/>
+<text class="t" x="70" y="626">X-gal (colourless)</text>
+<path class="arr" d="M262,619 L302,619"/>
+<text class="s" x="282" y="606" text-anchor="middle">cut</text>
+<text class="t" x="314" y="626">galactose + indole</text>
+<path class="arr" d="M500,619 L560,619"/>
+<text class="s" x="540" y="600" text-anchor="middle">oxidises</text>
+<rect x="572" y="602" width="28" height="28" rx="6" fill="var(--indigo)"/>
+<text class="t b" x="608" y="626" style="fill:var(--indigo)">blue dye</text>
+<text class="s" x="70" y="656">the blue (an indigo) is insoluble, so it stays in the cells</text>
+
+<!-- X-gal, right -->
+<path class="arr" d="M925,568 L925,594"/>
+<text class="t" x="855" y="626">X-gal (colourless)</text>
+<path class="arr" d="M1047,619 L1087,619"/>
+<text class="t" x="1099" y="626">not cut: stays colourless</text>
+
+<!-- colonies -->
+<path class="arr" d="M140,664 L140,690"/>
+<ellipse cx="140" cy="730" rx="56" ry="26" fill="var(--agar)"/>
+<circle cx="140" cy="730" r="17" fill="var(--indigo)"/>
+<text class="t" x="215" y="724"><tspan class="b" style="fill:var(--indigo)">Blue</tspan>: plasmid with no insert.</text>
+<text class="t" x="215" y="750">Skip it.</text>
+<path class="arr" d="M925,664 L925,690"/>
+<ellipse cx="925" cy="730" rx="56" ry="26" fill="var(--agar)"/>
+<circle cx="925" cy="730" r="17" fill="#fbfbf6" stroke="var(--line)" stroke-width="2"/>
+<text class="t" x="1000" y="724"><tspan class="b">White</tspan>: plasmid with your insert.</text>
+<text class="t" x="1000" y="750">Pick it, grow it, isolate the plasmid (miniprep).</text>
+
+</g>
+<!-- footer -->
+<text class="t b" x="40" y="852">Why is &#945; so small?</text>
+<text class="t" x="40" y="880">It only has to supply what &#969; is missing: the N-terminal stretch (residues 11&#8211;41) that lets the subunits pair into a tetramer. The host</text>
+<text class="t" x="40" y="906">carries the other ~970 amino acids, so the vector needs only a short lacZ&#945;, not all 3 kb of lacZ. A small plasmid copies to high number,</text>
+<text class="t" x="40" y="932">transforms well, leaves room for inserts, and can hold the MCS inside lacZ&#945; in frame.</text>
+<text class="s" x="40" y="956">On the plate: ampicillin keeps only cells with a plasmid; IPTG frees the lac promoter so lacZ&#945; is made.</text>
+</svg>
+<script>
+(function () {
+  function light() { var r = document.documentElement; r.dataset.theme = r.dataset.theme === 'light' ? 'dark' : 'light'; }
+  function full() { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); }
+  document.getElementById('bL').onclick = light; document.getElementById('bF').onclick = full;
+  document.addEventListener('keydown', function (e) { var k = e.key.toLowerCase(); if (k === 'l') light(); else if (k === 'f') full(); });
+})();
+</script>
+</body>
+</html>

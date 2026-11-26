@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stacking gel: a rolling start for proteins</title>
+<style>
+:root{--bg:#0f141b;--panel:#161d27;--ink:#e8edf3;--muted:#9fb0c3;--line:#2c3746;--frame:#8d99a8;--tank:#3a4452;--stack:#2b4766;--run:#1d2a3a;--well:#25303d;
+  --gly:#f08a3c;--glyoff:#6b5444;--cl:#4caf50;--prot:#5aa2ff;--dye:#b48cff;--volt:#f2d24b;--neg:#e05a5a}
+[data-theme=light]{--bg:#f7f8fa;--panel:#ffffff;--ink:#16202c;--muted:#4a5a6c;--line:#cfd7e1;--frame:#6f7b89;--tank:#c9ced6;--stack:#bcd3ec;--run:#e9f0f8;--well:#dfe4ea;
+  --gly:#e0701c;--glyoff:#d9c3b2;--cl:#2e8b3a;--prot:#1f5fae;--dye:#6b3fd0;--volt:#c79a00;--neg:#c0392b}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:18px/1.35 system-ui,Segoe UI,Roboto,Arial,sans-serif;display:flex;flex-direction:column;overflow:hidden}
+header{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;padding:10px 20px 2px}
+h1{font-size:26px;margin:0}
+.sub{color:var(--muted);font-size:16px}
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:6px 20px 6px;font-size:16px}
+button{font:inherit;font-size:16px;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:4px 11px;cursor:pointer}
+button[aria-pressed=true]{outline:2px solid var(--prot)}
+input[type=range]{flex:1;min-width:160px}
+main{flex:1;min-height:0;display:flex;gap:12px;padding:0 20px 6px}
+#stage{flex:1;min-width:0;position:relative}
+canvas{position:absolute;inset:0;width:100%;height:100%}
+aside{width:390px;flex:none;display:flex;flex-direction:column;gap:10px;overflow:hidden}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+.steps{display:flex;gap:6px;margin-bottom:8px}
+.steps i{flex:1;height:6px;border-radius:3px;background:var(--line)}
+.steps i.on{background:var(--prot)}
+#stTitle{font-size:20px;font-weight:700;margin:0 0 4px}
+#stText{font-size:17px;margin:0}
+table{width:100%;border-collapse:collapse;font-size:16px}
+th{font-size:15px;color:var(--muted);font-weight:600;text-align:left;padding:2px 4px}
+td{padding:5px 4px;border-top:1px solid var(--line);vertical-align:top}
+td.who{white-space:nowrap;font-weight:700}
+td.ans{color:var(--ink)}
+td.blank{color:var(--muted)}
+.sw{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+.key{display:flex;gap:14px;flex-wrap:wrap;color:var(--muted);font-size:15px}
+.key span{white-space:nowrap}
+.bandsw{display:inline-block;width:18px;height:5px;border-radius:2px;vertical-align:middle;margin-right:6px}
+.foot{color:var(--muted);font-size:14px;padding:0 20px 8px;margin:0}
+</style>
+<script type="application/json" id="demo-meta">{"title":"Stacking gel: a rolling start for proteins","course":"BMSC 240 (Module 7: protein electrophoresis)","summary":"Discontinuous SDS-PAGE side by side with a one-gel run: Cl- leads, glycine trails at pH 6.8 and leaves a high-voltage gap, the proteins stack into one thin line whatever the load, then glycine speeds up at pH 8.8 and the race by size begins."}</script>
+</head>
+<body>
+<header>
+  <h1>Stacking gel: a rolling start for proteins</h1>
+  <span class="sub">Same sample, loaded at 2, 5 and 10 &micro;L. Left: stacking gel on a running gel. Right: running gel only.</span>
+</header>
+<div class="bar">
+  <button id="bPlay" title="Space">Play (Space)</button>
+  <button id="bBack" title="Left arrow">&#8592; Back</button>
+  <button id="bNext" title="Right arrow">Next &#8594;</button>
+  <button id="bReset" title="R">Reset (R)</button>
+  <input id="scrub" type="range" min="0" max="1000" value="0" aria-label="time">
+  <button id="bCmp" aria-pressed="true" title="C">One-gel run (C)</button>
+  <button id="bAns" aria-pressed="false" title="A">Show all answers (A)</button>
+  <button id="bLight" title="L">Light (L)</button>
+  <button id="bFull" title="F">Full screen (F)</button>
+</div>
+<main>
+  <div id="stage"><canvas id="cv"></canvas></div>
+  <aside>
+    <div class="card">
+      <div class="steps" id="steps"></div>
+      <p id="stTitle"></p>
+      <p id="stText"></p>
+    </div>
+    <div class="card">
+      <table>
+        <thead><tr><th></th><th>Stacking gel<br>5%, pH 6.8</th><th>Running gel<br>12%, pH 8.8</th></tr></thead>
+        <tbody id="tb"></tbody>
+      </table>
+    </div>
+    <div class="card key">
+      <span><i class="sw" style="background:var(--cl)"></i>Cl&#8315;</span>
+      <span><i class="sw" style="background:var(--gly)"></i>glycine, charged</span>
+      <span><i class="sw" style="background:var(--glyoff)"></i>glycine, neutral</span>
+      <span><i class="bandsw" style="background:var(--prot)"></i>protein</span>
+      <span><i class="bandsw" style="background:var(--dye)"></i>dye</span>
+      <span><i class="bandsw" style="background:var(--volt)"></i>voltage push</span>
+    </div>
+  </aside>
+</main>
+<p class="foot">Glycine (pK<sub>a</sub> 2.3 and 9.6, pI about 6) carries a net &minus;1 about 0.2% of the time at pH 6.8, 5% at 8.3 and 14% at 8.8, roughly 80 times more often in the running gel than in the stacking gel. The dots are lit more often than that so the change shows. Proteins are drawn as if visible; in a real run you see only the dye until you stain. Distances and speeds are stylised. The one-gel clock starts when the stack enters the running gel, so both races run side by side.</p>
+<script>
+(function () {
+  'use strict';
+  // ---- model (mm, sim time units). Gel: wells -8..0, stacking 0..10, running 10..70 ----
+  var WELL = 8, SG = 10, RG = 60, BOT = SG + RG;
+  var T0 = 8;            // every lane's boundary reaches the bottom of its well at T0 (stylised)
+  var U = 1;             // boundary speed in the stacking gel
+  var VLO = 0.3;         // protein speed in the low-field Cl- zone
+  var UR = 1.6;          // boundary (front) speed in the running gel; dye rides it, Rf = 1
+  var TR = T0 + SG / U;  // stack reaches the running gel
+  var TEND = TR + RG / UR;
+  var TC_END = RG / UR;  // the one-gel run, on its own clock
+  var OFF = 0.3, DYEOFF = 0.05, S0 = 0.08, DIFF = 0.0015, S0C = 0.2, DIFFC = 0.004; // stacked bands thin (Kyle 10-27); one-gel run unchanged
+  var VOLS = [2, 5, 10], MMUL = 0.8; // uL -> sample height in the well (mm)
+  var KDA = [97, 66, 45, 40, 29, 21];
+  var N = 60;
+  var GLY_FRAC = {6.8: 1 / (1 + Math.pow(10, 9.6 - 6.8)), 8.3: 1 / (1 + Math.pow(10, 9.6 - 8.3)), 8.8: 1 / (1 + Math.pow(10, 9.6 - 8.8))};
+  var LIT = {6.8: 0.10, 8.3: 0.35, 8.8: 0.60};
+  function rf(k) { return 2.177 - 1.02 * Math.log10(k); }
+
+  // boundary (Cl-/glycine) below the wells: one sheet across the gel
+  function B(t) { if (t <= T0) return -WELL * (1 - t / T0); if (t <= TR) return U * (t - T0); return Math.min(BOT + 2, SG + UR * (t - TR)); }
+  // boundary inside a lane's well: starts at the top of that lane's sample
+  function bLane(t, H) { if (t <= T0) return -H * (1 - t / T0); return B(t); }
+  // a protein molecule that started at y0 in a sample of height H (stacking gel)
+  function captureT(y0, H) {
+    var s1 = H / T0 - VLO;
+    if (s1 > 0) { var t1 = (y0 + H) / s1; if (t1 <= T0) return t1; }
+    return (y0 + U * T0) / (U - VLO);
+  }
+  function molY(y0, H, k, t) {
+    var tc = captureT(y0, H);
+    if (t < tc) return y0 + VLO * t;
+    if (t <= TR) return bLane(t, H) - OFF;
+    return SG - OFF + rf(k) * UR * (t - TR);
+  }
+  function sig(t) { return t <= TR ? S0 : Math.sqrt(S0 * S0 + DIFF * (t - TR)); }
+  // one-gel run (its own coordinate: gel top = 0); proteins move at UR in the well, at Rf*UR in the gel
+  function molYc(y0, k, tc) { var tin = -y0 / UR; return tc < tin ? y0 + UR * tc : rf(k) * UR * (tc - tin); }
+  function sigc(tc) { return Math.sqrt(S0C * S0C + DIFFC * tc); }
+
+  // molecules of one lane: {k, y, s} list (k = 0 for dye)
+  function lane(gel, vol, t) {
+    var H = vol * MMUL, out = [];
+    for (var j = 0; j < N; j++) {
+      var y0 = -H + H * (j + 0.5) / N;
+      if (gel === 'stack') {
+        var tt = Math.min(t, TEND);
+        KDA.forEach(function (k) { out.push({k: k, y: molY(y0, H, k, tt), s: sig(tt)}); });
+        out.push({k: 0, y: tt <= T0 ? Math.max(y0, bLane(tt, H)) - DYEOFF : B(tt) - DYEOFF, s: S0});
+      } else {
+        var tc = Math.max(0, Math.min(t - TR, TC_END));
+        KDA.forEach(function (k) { out.push({k: k, y: molYc(y0, k, tc) + SG, s: sigc(tc)}); });
+        out.push({k: 0, y: Math.min(y0 + UR * tc, RG) + SG, s: S0C});
+      }
+    }
+    return {H: H, w: vol / N, m: out};
+  }
+  // density profile on 0.2 mm bins from -9 to 71
+  var BIN = 0.2, YLO = -9, NB = Math.round((BOT + 1 - YLO) / BIN);
+  function profile(L, dye) {
+    var d = new Float64Array(NB);
+    L.m.forEach(function (q) {
+      if ((q.k === 0) !== dye) return;
+      var lo = Math.max(0, Math.floor((q.y - 3 * q.s - YLO) / BIN)), hi = Math.min(NB - 1, Math.ceil((q.y + 3 * q.s - YLO) / BIN));
+      for (var b = lo; b <= hi; b++) { var yc = YLO + (b + 0.5) * BIN, z = (yc - q.y) / q.s; d[b] += L.w * Math.exp(-0.5 * z * z) / (q.s * 2.5066); }
+    });
+    return d;
+  }
+
+  // ---- stages ----
+  var STAGES = [
+    {t: 0, title: 'Loaded, power off', text: 'Three wells: 2, 5 and 10 µL of the same sample, in Tris-HCl pH 6.8 (so full of Cl⁻). Glycine waits in the upper buffer at pH 8.3. A full well makes a tall column of sample.'},
+    {t: 4, title: 'Power on: Cl⁻ runs ahead', text: 'Cl⁻ is tiny and always charged, so it races toward the + electrode.'},
+    {t: T0 + 1.5, title: 'Glycine slows down', text: 'In the pH 6.8 gel glycine sits close to its pI (about 6). It is neutral most of the time, and a neutral molecule is not pulled. It falls behind and leaves a gap with few charged ions, where the voltage spikes.'},
+    {t: T0 + 4.5, title: 'The rolling start', text: 'In the high voltage of the gap the proteins rush forward; ahead, among the Cl⁻, the push is weak. So every protein ends up pinned at the front of the gap: one thin line, whether the well was full or nearly empty.'},
+    {t: TR + 7, title: 'The race begins', text: 'At pH 8.8 glycine is charged far more often, so it speeds up and passes the proteins. The stack is released as a thin line into a 12% gel, which sieves by size.'},
+    {t: TEND, title: 'Dye at the bottom', text: 'Big proteins went slowly, small ones fast. Every lane started from the same thin line, so 45 and 40 kDa stay apart even at 10 µL. Without the stacking gel (right) the bands are as tall as the sample was.'}
+  ];
+  var ROWS = [
+    {who: 'Cl⁻', c: 'var(--cl)', a: ['fast: small, always charged', 2], b: ['still fast', 4]},
+    {who: 'Glycine', c: 'var(--gly)', a: ['slow: mostly neutral', 2], b: ['fast: charged far more often', 4]},
+    {who: 'Protein', c: 'var(--prot)', a: ['pinned at the front of the gap', 3], b: ['by size: big slow, small fast', 5]}
+  ];
+  var t = 0, playing = false, target = null, showCmp = true, answers = false;
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function stageAt(tt) { var s = 0; for (var i = 0; i < STAGES.length; i++) if (tt >= STAGES[i].t - 1e-6) s = i; return s; }
+
+  // ---- seeded dots ----
+  var seed = 7; function rnd() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
+  var CL = [], GL = [], TK = [];
+  for (var i = 0; i < 110; i++) CL.push({x: rnd(), q: rnd(), ph: rnd() * 6.28});
+  for (i = 0; i < 90; i++) GL.push({x: rnd(), q: rnd(), ph: rnd() * 6.28, h: rnd()});
+  for (i = 0; i < 26; i++) TK.push({x: rnd(), q: rnd(), h: rnd(), lo: rnd() < 0.5});
+  function lit(d, ph, tt) { var f = Math.floor(tt * 3 + d.h * 97); var r = Math.abs(Math.sin(f * 12.9898 + d.h * 78.233) * 43758.5453) % 1; return r < LIT[ph]; }
+
+  // ---- drawing ----
+  var cv = document.getElementById('cv'), ctx = cv.getContext('2d'), G = {};
+  function css(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+  function layout() {
+    var r = cv.parentNode.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    G.w = r.width; G.h = r.height;
+    G.top = 30; G.s = (G.h - G.top - 10) / 100; // -20..80 mm
+    var gw = Math.min(300, (G.w - 200) / (showCmp ? 1.9 : 1));
+    G.mx = 58; G.mw = gw;
+    G.cx = G.mx + gw + 160; G.cw = Math.min(gw * 0.9, G.w - G.cx - 10);
+  }
+  function Y(mm) { return G.top + (mm + 20) * G.s; }
+  function laneX(x0, w, i) { return x0 + w * (0.2 + 0.3 * i); }
+  function tank(x0, w, y1, y2, dots, ph, tt) {
+    ctx.fillStyle = css('--tank'); ctx.fillRect(x0 - 10, Y(y1), w + 20, Y(y2) - Y(y1));
+    if (!dots) return;
+    TK.forEach(function (d) {
+      var y = y1 + 1 + d.q * (y2 - y1 - 4.5);
+      ctx.fillStyle = lit(d, ph, tt) ? css('--gly') : css('--glyoff');
+      ctx.beginPath(); ctx.arc(x0 - 4 + d.x * (w + 8), Y(y), 3.2, 0, 6.29); ctx.fill();
+    });
+  }
+  function text(s, x, y, al, col, size, bold) { ctx.fillStyle = col || css('--ink'); ctx.font = (bold ? '700 ' : '') + (size || 16) + 'px system-ui,Segoe UI,Arial'; ctx.textAlign = al || 'left'; ctx.fillText(s, x, y); }
+  function electrode(x, y, sign) {
+    ctx.strokeStyle = css('--neg'); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 11, 0, 6.29); ctx.stroke();
+    text(sign, x, y + 6, 'center', css('--neg'), 18, true);
+  }
+  function bands(x0, w, gel, tt) {
+    var lw = w * 0.2, pc = css('--prot'), dc = css('--dye');
+    VOLS.forEach(function (v, i) {
+      var L = lane(gel, v, tt), cx = laneX(x0, w, i);
+      [[profile(L, true), dc, 0.25], [profile(L, false), pc, 0.45]].forEach(function (pp) {
+        var d = pp[0]; ctx.fillStyle = pp[1];
+        for (var b = 0; b < NB; b++) { if (d[b] < 0.02) continue; ctx.globalAlpha = 1 - Math.exp(-pp[2] * d[b]); var yc = YLO + b * BIN; ctx.fillRect(cx - lw / 2, Y(yc), lw, Y(yc + BIN) - Y(yc) + 0.6); }
+      });
+      ctx.globalAlpha = 1;
+    });
+  }
+  function cassetteFrame(x0, w, yTop) { ctx.strokeStyle = css('--frame'); ctx.lineWidth = 2; ctx.strokeRect(x0, Y(yTop), w, Y(BOT) - Y(yTop)); }
+  function drawMain(tt) {
+    var x0 = G.mx, w = G.mw, lw = w * 0.2, b = B(tt);
+    tank(x0, w, -20, -WELL, true, 8.3, tt);
+    // gel bodies
+    ctx.fillStyle = css('--stack'); ctx.fillRect(x0, Y(-WELL), w, Y(SG) - Y(-WELL));
+    ctx.fillStyle = css('--run'); ctx.fillRect(x0, Y(SG), w, Y(BOT) - Y(SG));
+    VOLS.forEach(function (v, i) { ctx.fillStyle = css('--tank'); ctx.fillRect(laneX(x0, w, i) - lw / 2, Y(-WELL), lw, Y(0) - Y(-WELL)); });
+    tank(x0, w, BOT, BOT + 9, true, 8.3, tt);
+    // ions: Cl- below the boundary, glycine above it (inside the gel)
+    var cl = css('--cl'), go = css('--gly'), gf = css('--glyoff');
+    CL.forEach(function (d) {
+      var lo = Math.max(b, -WELL) + 0.6; if (lo >= BOT - 0.5) return;
+      var y = lo + d.q * (BOT - 0.5 - lo) + 0.3 * Math.sin(d.ph + tt);
+      ctx.fillStyle = cl; ctx.beginPath(); ctx.arc(x0 + 5 + d.x * (w - 10), Y(y), 3.2, 0, 6.29); ctx.fill();
+    });
+    if (b > -WELL + 0.3) GL.forEach(function (d) {
+      var hi = Math.min(b, BOT) - 0.6, y = -WELL + 0.3 + d.q * (hi + WELL - 0.3) + 0.3 * Math.sin(d.ph + tt);
+      if (y > hi) return;
+      ctx.fillStyle = lit(d, y > SG ? 8.8 : 6.8, tt) ? go : gf;
+      ctx.beginPath(); ctx.arc(x0 + 5 + d.x * (w - 10), Y(y), 3.2, 0, 6.29); ctx.fill();
+    });
+    bands(x0, w, 'stack', tt);
+    cassetteFrame(x0, w, -WELL);
+    // voltage strip: high in the glycine zone of the stacking gel, moderate in glycine at pH 8.8, low among Cl-
+    var vx = x0 + w + 14, vw = 30, vc = css('--volt');
+    ctx.strokeStyle = css('--line'); ctx.lineWidth = 1; ctx.strokeRect(vx, Y(-WELL), vw, Y(BOT) - Y(-WELL));
+    function vbar(y1, y2, f) { if (y2 <= y1) return; ctx.fillStyle = vc; ctx.globalAlpha = 0.25 + 0.75 * f; ctx.fillRect(vx, Y(y1), vw * f, Y(y2) - Y(y1)); ctx.globalAlpha = 1; }
+    if (tt > 0) {
+      vbar(Math.max(-WELL, b), BOT, 0.2);
+      vbar(-WELL, Math.min(b, SG), 1);
+      if (b > SG) vbar(SG, Math.min(b, BOT), 0.45);
+    }
+    text('voltage', vx + vw / 2, Y(-WELL) - 22, 'center', css('--muted'), 13);
+    text('push', vx + vw / 2, Y(-WELL) - 8, 'center', css('--muted'), 13);
+    // labels
+    text('pH', x0 - 8, Y(-17), 'right', css('--muted'), 15);
+    text('8.3', x0 - 8, Y(-12), 'right', css('--ink'), 17, true);
+    text('6.8', x0 - 8, Y(5) + 6, 'right', css('--ink'), 17, true);
+    text('8.8', x0 - 8, Y(40) + 6, 'right', css('--ink'), 17, true);
+    electrode(x0 + w - 4, Y(-20) - 4, '−'); electrode(x0 + w - 4, Y(BOT + 9) + 2, '+');
+    text('Stacking gel (rolling start)', x0, G.top - 12, 'left', css('--ink'), 17, true);
+    VOLS.forEach(function (v, i) { text(v + ' µL', laneX(x0, w, i), Y(-WELL) - 4, 'center', css('--ink'), 14); });
+    text('5%', vx + vw + 6, Y(5) + 5, 'left', css('--muted'), 14);
+    text('12%', vx + vw + 6, Y(14) + 5, 'left', css('--muted'), 14);
+    if (tt >= TEND - 1e-6) KDA.forEach(function (k, i) {
+      var y = SG - OFF + rf(k) * RG + 5; text(k + ' kDa', vx + vw + 6, Y(y), 'left', css('--ink'), 14);
+    });
+  }
+  function drawCmp(tt) {
+    var x0 = G.cx, w = G.cw, lw = w * 0.2, yW = SG - WELL;
+    tank(x0, w, -20, yW, false);
+    ctx.fillStyle = css('--run'); ctx.fillRect(x0, Y(yW), w, Y(BOT) - Y(yW));
+    VOLS.forEach(function (v, i) { ctx.fillStyle = css('--tank'); ctx.fillRect(laneX(x0, w, i) - lw / 2, Y(yW), lw, Y(SG) - Y(yW)); });
+    tank(x0, w, BOT, BOT + 9, false);
+    bands(x0, w, 'cmp', tt);
+    cassetteFrame(x0, w, yW);
+    text('8.8', x0 - 8, Y(40) + 6, 'right', css('--ink'), 17, true);
+    text('Running gel only (standing start)', x0 - 30, G.top - 12, 'left', css('--ink'), 17, true);
+    VOLS.forEach(function (v, i) { text(v + ' µL', laneX(x0, w, i), Y(yW) - 4, 'center', css('--ink'), 14); });
+    text('12%', x0 + w + 8, Y(14) + 5, 'left', css('--muted'), 14);
+    if (tt < TR) text('waits for the race', x0 + w / 2, Y(-4), 'center', css('--muted'), 15);
+    text('ions not drawn', x0 + w / 2, Y(BOT + 6), 'center', css('--muted'), 13);
+  }
+  function draw() {
+    layout();
+    ctx.clearRect(0, 0, G.w, G.h);
+    drawMain(t);
+    if (showCmp) drawCmp(t);
+  }
+
+  // ---- panel ----
+  var stepsEl = document.getElementById('steps');
+  STAGES.forEach(function () { stepsEl.appendChild(document.createElement('i')); });
+  function panel() {
+    var s = stageAt(t);
+    Array.prototype.forEach.call(stepsEl.children, function (el, i) { el.className = i <= s ? 'on' : ''; });
+    document.getElementById('stTitle').textContent = STAGES[s].title;
+    document.getElementById('stText').textContent = STAGES[s].text;
+    document.getElementById('tb').innerHTML = ROWS.map(function (r) {
+      function cell(a) { var on = answers || s >= a[1]; return '<td class="' + (on ? 'ans' : 'blank') + '">' + (on ? a[0] : '______') + '</td>'; }
+      return '<tr><td class="who"><i class="sw" style="background:' + r.c + '"></i>' + r.who + '</td>' + cell(r.a) + cell(r.b) + '</tr>';
+    }).join('');
+    document.getElementById('scrub').value = Math.round(1000 * t / TEND);
+    document.getElementById('bPlay').textContent = playing ? 'Pause (Space)' : 'Play (Space)';
+  }
+  function render() { draw(); panel(); }
+
+  // ---- time ----
+  var last = null, RATE = 4; // sim units per second
+  function tick(now) {
+    if (!playing) { last = null; return; }
+    if (last !== null) {
+      t = Math.min(TEND, t + RATE * (now - last) / 1000);
+      if (target !== null && t >= target) { t = target; target = null; playing = false; }
+      if (t >= TEND) playing = false;
+    }
+    last = now; render();
+    if (playing) requestAnimationFrame(tick);
+  }
+  function go(to) { if (reduce) { t = to; playing = false; target = null; render(); return; } target = to; if (to < t) { t = to; target = null; playing = false; render(); return; } if (!playing) { playing = true; requestAnimationFrame(tick); } }
+  function next() { var s = stageAt(t); if (s < STAGES.length - 1) go(STAGES[s + 1].t); }
+  function back() { var s = stageAt(t); var i = (t > STAGES[s].t + 0.01) ? s : Math.max(0, s - 1); playing = false; target = null; t = STAGES[i].t; render(); }
+  function play() {
+    if (reduce) { next(); return; }
+    if (playing) { playing = false; target = null; render(); return; }
+    if (t >= TEND) t = 0;
+    target = null; playing = true; requestAnimationFrame(tick);
+  }
+  function reset() { playing = false; target = null; t = 0; render(); }
+  document.getElementById('bPlay').onclick = play;
+  document.getElementById('bNext').onclick = next;
+  document.getElementById('bBack').onclick = back;
+  document.getElementById('bReset').onclick = reset;
+  document.getElementById('scrub').oninput = function () { playing = false; target = null; t = TEND * this.value / 1000; render(); };
+  function press(id, on) { document.getElementById(id).setAttribute('aria-pressed', on ? 'true' : 'false'); }
+  document.getElementById('bCmp').onclick = function () { showCmp = !showCmp; press('bCmp', showCmp); render(); };
+  document.getElementById('bAns').onclick = function () { answers = !answers; press('bAns', answers); render(); };
+  function light() { var r = document.documentElement; r.dataset.theme = r.dataset.theme === 'light' ? 'dark' : 'light'; render(); }
+  document.getElementById('bLight').onclick = light;
+  function full() { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); }
+  document.getElementById('bFull').onclick = full;
+  document.addEventListener('keydown', function (e) {
+    if (e.target.tagName === 'INPUT') return;
+    var k = e.key;
+    if (k === ' ') { e.preventDefault(); play(); }
+    else if (k === 'ArrowRight') { e.preventDefault(); next(); }
+    else if (k === 'ArrowLeft') { e.preventDefault(); back(); }
+    else if (k === 'r' || k === 'R') reset();
+    else if (k === 'c' || k === 'C') document.getElementById('bCmp').click();
+    else if (k === 'a' || k === 'A') document.getElementById('bAns').click();
+    else if (k === 'l' || k === 'L') light();
+    else if (k === 'f' || k === 'F') full();
+  });
+  window.addEventListener('resize', render);
+
+  // ---- self-test ----
+  function stats(ys) { var m = ys.reduce(function (a, b) { return a + b; }, 0) / ys.length; return {m: m, sd: Math.sqrt(ys.reduce(function (a, b) { return a + (b - m) * (b - m); }, 0) / ys.length), lo: Math.min.apply(null, ys), hi: Math.max.apply(null, ys)}; }
+  function ysOf(gel, vol, tt, k) { return lane(gel, vol, tt).m.filter(function (q) { return q.k === k; }).map(function (q) { return q.y; }); }
+  function resolved(gel, vol, k1, k2) {
+    var L = lane(gel, vol, TEND), keep = {m: L.m.filter(function (q) { return q.k === k1 || q.k === k2; }), w: L.w};
+    var d = profile(keep, false), a = stats(ysOf(gel, vol, TEND, k1)).m, b = stats(ysOf(gel, vol, TEND, k2)).m;
+    function at(y) { return d[Math.round((y - YLO) / BIN - 0.5)]; }
+    var dip = Infinity; for (var y = Math.min(a, b); y <= Math.max(a, b); y += BIN) dip = Math.min(dip, at(y));
+    return dip < 0.7 * Math.min(at(a), at(b));
+  }
+  window.STACKTEST = function () {
+    var f = [];
+    // (a) stack thickness at the running-gel entry does not depend on load
+    var s2 = stats(ysOf('stack', 2, TR, 45)), s10 = stats(ysOf('stack', 10, TR, 45));
+    if (s10.hi - s10.lo > 0.01 || s2.hi - s2.lo > 0.01) f.push('(a) stack not thin: ' + (s10.hi - s10.lo).toFixed(3));
+    // (b) every lane arrives at the running gel at the same moment and depth
+    if (Math.abs(s2.m - s10.m) > 1e-9 || Math.abs(s10.m - (SG - OFF)) > 1e-9) f.push('(b) lanes arrive apart');
+    // (c) in the stacking gel: Cl- zone ahead of the proteins, glycine behind (proteins never past the boundary)
+    var tAll = Math.max.apply(null, VOLS.map(function (v) { return captureT(0, v * MMUL); }));
+    if (B(tAll) >= SG - 1) f.push('(c) stack not formed inside the stacking gel');
+    for (var tt = Math.ceil(tAll); tt <= TR; tt += 0.25) VOLS.forEach(function (v) { KDA.forEach(function (k) { var q = stats(ysOf('stack', v, tt, k)); if (q.hi > B(tt) + 1e-9 || q.lo < B(tt) - 1) f.push('(c) protein off the boundary at t=' + tt); }); });
+    // (d) in the running gel glycine (the boundary) ends ahead of every protein
+    if (stats(ysOf('stack', 10, TEND, 21)).hi >= B(TEND)) f.push('(d) protein ahead of glycine');
+    // (e) bigger proteins travel less
+    var m = KDA.map(function (k) { return stats(ysOf('stack', 5, TEND, k)).m; });
+    for (var i = 1; i < m.length; i++) if (m[i] <= m[i - 1]) f.push('(e) size order broken at ' + KDA[i]);
+    // (f) without a stacking gel, band height grows with load
+    var c2 = stats(ysOf('cmp', 2, TEND, 45)), c10 = stats(ysOf('cmp', 10, TEND, 45));
+    if (!((c10.hi - c10.lo) > 3 * (c2.hi - c2.lo))) f.push('(f) one-gel bands do not grow with load');
+    // (g) 45 and 40 kDa: resolved with stacking at 10 uL, merged without; resolved without at 2 uL
+    if (!resolved('stack', 10, 45, 40)) f.push('(g) stacked 10 uL not resolved');
+    if (resolved('cmp', 10, 45, 40)) f.push('(g) one-gel 10 uL should merge');
+    if (!resolved('cmp', 2, 45, 40)) f.push('(g) one-gel 2 uL should resolve');
+    // (h) glycine charged more often as pH rises; the lit fractions keep that order
+    if (!(GLY_FRAC[6.8] < GLY_FRAC[8.3] && GLY_FRAC[8.3] < GLY_FRAC[8.8])) f.push('(h) glycine fractions out of order');
+    if (!(LIT[6.8] < LIT[8.3] && LIT[8.3] < LIT[8.8])) f.push('(h) lit fractions out of order');
+    // (i) all dye and protein sit inside the gel at the end
+    if (B(TEND) - DYEOFF > BOT + 1e-9) f.push('(i) dye past the bottom');
+    return {fails: f, glyFrac: GLY_FRAC, ends: m.map(function (y) { return +(y - SG).toFixed(2); })};
+  };
+  render();
+})();
+</script>
+</body>
+</html>

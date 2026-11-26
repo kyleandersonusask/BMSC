@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Size exclusion: how fraction size hides peaks</title>
+<style>
+:root{--bg:#0f141b;--panel:#161d27;--ink:#e8edf3;--muted:#9fb0c3;--line:#2c3746;--true:#5f6f84;--bar:#3d7bd6;--bar2:#9cc3ff;--pk:#f2b84b;--vo:#d36b6b}
+[data-theme=light]{--bg:#f7f8fa;--panel:#ffffff;--ink:#16202c;--muted:#4a5a6c;--line:#cfd7e1;--true:#9aa7b6;--bar:#2f64b5;--bar2:#2f64b5;--pk:#b06a00;--vo:#b23a3a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:18px/1.35 system-ui,Segoe UI,Roboto,Arial,sans-serif}
+header{display:flex;align-items:baseline;gap:18px;flex-wrap:wrap;padding:14px 22px 6px}
+h1{font-size:28px;margin:0}
+.sub{color:var(--muted);font-size:17px}
+.bar{display:flex;gap:14px;align-items:center;flex-wrap:wrap;padding:6px 22px 10px;font-size:17px}
+button,select{font:inherit;font-size:16px;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:5px 12px;cursor:pointer}
+button[aria-pressed=true]{outline:2px solid var(--bar2)}
+label{display:flex;gap:8px;align-items:center}
+input[type=range]{width:220px}
+.out{font-variant-numeric:tabular-nums;min-width:9ch;font-weight:650}
+main{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:0 22px 12px}
+main.one{grid-template-columns:1fr}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 12px 4px}
+.card h2{font-size:19px;margin:2px 0 0;display:flex;justify-content:space-between;gap:10px}
+.card h2 .n{color:var(--pk);font-weight:700}
+svg{width:100%;height:auto;display:block}
+.ax{stroke:var(--line)} .tick{fill:var(--muted);font-size:13px}
+.truec{fill:none;stroke:var(--true);stroke-width:2;stroke-dasharray:5 4}
+.fr{fill:var(--bar);fill-opacity:.32;stroke:var(--bar);stroke-width:1}
+.fl{fill:none;stroke:var(--bar2);stroke-width:2.6}
+.fd{fill:var(--bar2)}
+.pm{fill:var(--pk);font-size:13px;font-weight:700}
+.vo{stroke:var(--vo);stroke-dasharray:3 4}
+.vol{fill:var(--vo);font-size:12px}
+.foot{color:var(--muted);font-size:15px;padding:0 22px 14px}
+.key{display:flex;gap:16px;flex-wrap:wrap;color:var(--muted);font-size:15px}
+.key i{display:inline-block;width:22px;height:0;border-top:2px dashed var(--true);vertical-align:middle;margin-right:6px}
+.key b{display:inline-block;width:16px;height:12px;background:var(--bar);opacity:.5;vertical-align:middle;margin-right:6px}
+</style>
+<script type="application/json" id="demo-meta">{"title":"Size exclusion: big fractions hide peaks","course":"BMSC (protein purification)","summary":"One size-exclusion run collected into 2, 5, 10 or 20 fractions (or any count from 1 to 60): wider fractions average neighbouring peaks together until they vanish."}</script>
+</head>
+<body>
+<header>
+  <h1>Size exclusion: big fractions hide peaks</h1>
+  <span class="sub">The same column run, collected into 2, 5, 10 or 20 tubes. Each tube holds the average of everything that came off while it was filling.</span>
+</header>
+<div class="bar">
+  <button id="bTrue" aria-pressed="true" title="T">True trace (T)</button>
+  <button id="bOne" aria-pressed="false" title="1">One big panel (1)</button>
+  <label for="nf">Your own tube count <input id="nf" type="range" min="1" max="60" value="30"><span class="out" id="nfo"></span></label>
+  <button id="bLight" title="L">Light (L)</button>
+  <button id="bFull" title="F">Full screen (F)</button>
+  <span class="key"><span><i></i>what is really coming off the column</span><span><b></b>what each tube measures</span></span>
+</div>
+<main id="grid"></main>
+<p class="foot">Column: V<sub>t</sub> = 30 mL, V<sub>o</sub> = 5 mL; K = (V<sub>e</sub> &minus; V<sub>o</sub>)/(V<sub>t</sub> &minus; V<sub>o</sub>). Peaks are stylised Gaussians placed like the 1 mL run on the slide (about 8, 15, 20 and 27 mL). A tube's reading is the mean concentration over its volume; peaks are counted where a tube reads higher than both neighbours. Smaller fractions also need uniform packing to stay sharp; this model keeps the packing ideal.</p>
+<script>
+(function () {
+  'use strict';
+  var VT = 30, VO = 5;
+  // stylised peaks shaped like the slide's 1 mL run: centre (mL), height (mg/mL), sd (mL)
+  var PEAKS = [{c: 8, h: 8, s: 0.9, n: 'large'}, {c: 15, h: 15, s: 0.75, n: 'mid'}, {c: 20, h: 12, s: 0.95, n: 'smaller'}, {c: 27, h: 3, s: 0.6, n: 'small'}];
+  function conc(v) { var y = 0; PEAKS.forEach(function (p) { y += p.h * Math.exp(-0.5 * Math.pow((v - p.c) / p.s, 2)); }); return y; }
+  // a tube's reading: the mean concentration over its volume (numerical integral)
+  function tube(a, b) { var n = 200, s = 0; for (var i = 0; i < n; i++) s += conc(a + (b - a) * (i + 0.5) / n); return s / n; }
+  function fractions(n) { var w = VT / n, out = []; for (var i = 0; i < n; i++) out.push({a: i * w, b: (i + 1) * w, m: (i + 0.5) * w, y: tube(i * w, (i + 1) * w)}); return out; }
+  function peaksOf(f) { var k = []; for (var i = 0; i < f.length; i++) { var l = i ? f[i - 1].y : -1, r = i < f.length - 1 ? f[i + 1].y : -1; if (f[i].y > l && f[i].y > r && f[i].y > 0.3) k.push(f[i]); } return k; }
+
+  var showTrue = true, one = false, custom = 30;
+  var W = 720, H = 250, L = 48, R = 14, T = 14, B = 44, YMAX = 16;
+  function X(v) { return L + (W - L - R) * v / VT; }
+  function Y(y) { return T + (H - T - B) * (1 - y / YMAX); }
+  function panel(n, title) {
+    var f = fractions(n), pk = peaksOf(f), s = [];
+    s.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + title + ': ' + pk.length + ' peaks visible">');
+    for (var g = 0; g <= YMAX; g += 4) s.push('<line class="ax" x1="' + L + '" x2="' + (W - R) + '" y1="' + Y(g) + '" y2="' + Y(g) + '"/><text class="tick" x="' + (L - 8) + '" y="' + (Y(g) + 4) + '" text-anchor="end">' + g + '</text>');
+    for (var v = 0; v <= VT; v += 5) s.push('<text class="tick" x="' + X(v) + '" y="' + (H - B + 18) + '" text-anchor="middle">' + v + '</text>');
+    s.push('<text class="tick" x="' + ((W + L) / 2) + '" y="' + (H - 6) + '" text-anchor="middle">elution volume (mL)</text>');
+    s.push('<text class="tick" transform="translate(13 ' + ((H - B + T) / 2) + ') rotate(-90)" text-anchor="middle">mg/mL protein</text>');
+    s.push('<line class="vo" x1="' + X(VO) + '" x2="' + X(VO) + '" y1="' + T + '" y2="' + (H - B) + '"/><text class="vol" x="' + (X(VO) + 4) + '" y="' + (T + 12) + '">V&#8338;</text>');
+    f.forEach(function (q) { s.push('<rect class="fr" x="' + X(q.a) + '" y="' + Y(q.y) + '" width="' + Math.max(1, X(q.b) - X(q.a) - 1) + '" height="' + (Y(0) - Y(q.y)) + '"/>'); });
+    if (showTrue) { var d = ''; for (var i = 0; i <= 600; i++) { var vv = VT * i / 600; d += (i ? 'L' : 'M') + X(vv).toFixed(1) + ' ' + Y(conc(vv)).toFixed(1); } s.push('<path class="truec" d="' + d + '"/>'); }
+    s.push('<path class="fl" d="' + f.map(function (q, i) { return (i ? 'L' : 'M') + X(q.m).toFixed(1) + ' ' + Y(q.y).toFixed(1); }).join('') + '"/>');
+    f.forEach(function (q) { s.push('<circle class="fd" cx="' + X(q.m) + '" cy="' + Y(q.y) + '" r="3.5"/>'); });
+    pk.forEach(function (q) { s.push('<text class="pm" x="' + X(q.m) + '" y="' + (Y(q.y) - 8) + '" text-anchor="middle">&#9650;</text>'); });
+    s.push('</svg>');
+    return '<section class="card"><h2><span>' + title + '</span><span class="n">' + pk.length + (pk.length === 1 ? ' peak' : ' peaks') + ' visible (4 real)</span></h2>' + s.join('') + '</section>';
+  }
+  function render() {
+    var grid = document.getElementById('grid');
+    grid.className = one ? 'one' : '';
+    document.getElementById('nfo').textContent = custom + ' tubes, ' + (VT / custom).toFixed(VT % custom ? 2 : 0) + ' mL each';
+    if (one) { grid.innerHTML = panel(custom, custom + ' fractions of ' + (VT / custom).toFixed(2).replace(/\.?0+$/, '') + ' mL'); return; }
+    grid.innerHTML = [2, 5, 10, 20].map(function (n) { return panel(n, n + ' fractions of ' + (VT / n).toFixed(1).replace(/\.0$/, '') + ' mL'); }).join('');
+  }
+  function press(id, on) { document.getElementById(id).setAttribute('aria-pressed', on ? 'true' : 'false'); }
+  document.getElementById('bTrue').onclick = function () { showTrue = !showTrue; press('bTrue', showTrue); render(); };
+  document.getElementById('bOne').onclick = function () { one = !one; press('bOne', one); render(); };
+  document.getElementById('nf').oninput = function () { custom = +this.value; if (!one) { one = true; press('bOne', true); } render(); };
+  function light() { var r = document.documentElement; r.dataset.theme = r.dataset.theme === 'light' ? 'dark' : 'light'; }
+  document.getElementById('bLight').onclick = light;
+  function full() { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); }
+  document.getElementById('bFull').onclick = full;
+  document.addEventListener('keydown', function (e) {
+    if (e.target.tagName === 'INPUT') return;
+    var k = e.key.toLowerCase();
+    if (k === 't') document.getElementById('bTrue').click();
+    else if (k === '1') document.getElementById('bOne').click();
+    else if (k === 'l') light();
+    else if (k === 'f') full();
+  });
+  // self-test: the tube means conserve total protein, and finer fractions never show fewer peaks than coarser ones here
+  window.SECTEST = function () {
+    var f = [];
+    var tot = tube(0, VT) * VT, sum = fractions(20).reduce(function (a, q) { return a + q.y * 1.5; }, 0);
+    if (Math.abs(tot - sum) > 1e-6 * tot) f.push('mass not conserved');
+    var c = [2, 5, 10, 20, 60].map(function (n) { return peaksOf(fractions(n)).length; });
+    for (var i = 1; i < c.length; i++) if (c[i] < c[i - 1]) f.push('peaks fell from ' + c[i - 1] + ' to ' + c[i]);
+    if (c[c.length - 1] !== 4) f.push('60 fractions should resolve all 4 peaks, got ' + c[c.length - 1]);
+    return {fails: f, counts: c};
+  };
+  render();
+})();
+</script>
+</body>
+</html>
